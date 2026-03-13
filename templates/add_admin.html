@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ongeza Admin</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f2f2f2;
+            padding: 30px;
+        }
+        .form-box {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        label, input, button {
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+        }
+        input {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .alert {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        .alert-success { color: green; }
+        .alert-danger { color: red; }
+    </style>
+</head>
+<body>
+    <div class="form-box">
+        <h2>➕ Ongeza Admin</h2>
+        <form method="POST">
+            <label>Jina la Admin</label>
+            <input type="text" name="username" required>
+
+            <label>Nywila</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Ongeza Admin</button>
+        </form>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

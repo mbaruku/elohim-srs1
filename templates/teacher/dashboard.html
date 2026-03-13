@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="sw">
+
+<head>
+<meta charset="UTF-8">
+<title>Dashboard ya Mwalimu</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/select2.min.css') }}">
+
+<!-- Font Awesome Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+
+.table th,.table td{
+vertical-align:middle;
+text-align:center;
+}
+
+.toast-body{
+font-weight:bold;
+}
+
+.card{
+border-radius:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<!-- Flash Messages -->
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+
+{% for category,message in messages %}
+
+<div class="alert alert-{{ category }} alert-dismissible fade show m-3">
+
+<i class="fa-solid fa-circle-info"></i> {{ message }}
+
+<button class="btn-close" data-bs-dismiss="alert"></button>
+
+</div>
+
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+
+
+<div class="container mt-4">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+<h3>
+<i class="fa-solid fa-user-tie"></i>
+Karibu, {{ teacher.username }}
+</h3>
+
+<div>
+
+<button class="btn btn-warning me-2"
+data-bs-toggle="modal"
+data-bs-target="#changePasswordModal">
+
+<i class="fa-solid fa-key"></i>
+Badili Password
+
+</button>
+
+<a href="/logout" class="btn btn-danger">
+
+<i class="fa-solid fa-right-from-bracket"></i>
+Logout
+
+</a>
+
+</div>
+
+</div>
+
+
+
+<!-- Subjects -->
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<h5 class="mb-3">
+
+<i class="fa-solid fa-book"></i>
+Masomo Unayofundisha
+
+</h5>
+
+
+{% for subject in subjects %}
+
+<div class="card mb-3 border">
+
+<div class="card-body d-flex justify-content-between align-items-center">
+
+<div>
+
+<strong>
+
+<i class="fa-solid fa-book-open"></i>
+
+{{ subject.subject }}
+
+</strong>
+
+- {{ subject.class_level }}
+
+</div>
+
+<button class="btn btn-success"
+
+data-bs-toggle="modal"
+
+data-bs-target="#uploadResultsModal_{{ loop.index }}">
+
+<i class="fa-solid fa-upload"></i>
+
+Upload Matokeo
+
+</button>
+
+</div>
+
+</div>
+
+
+
+<!-- Upload Results Modal -->
+
+<div class="modal fade"
+
+id="uploadResultsModal_{{ loop.index }}"
+
+tabindex="-1">
+
+<div class="modal-dialog modal-xl modal-dialog-scrollable">
+
+<form method="POST" action="/teacher/upload-result">
+
+<input type="hidden" name="subject" value="{{ subject.subject }}">
+
+<input type="hidden" name="class_level" value="{{ subject.class_level }}">
+
+<div class="modal-content">
+
+
+<div class="modal-header bg-primary text-white">
+
+<h5 class="modal-title">
+
+<i class="fa-solid fa-chart-column"></i>
+
+Upload Matokeo -
+
+{{ subject.subject }}
+
+({{ subject.class_level }})
+
+</h5>
+
+<button class="btn-close btn-close-white"
+
+data-bs-dismiss="modal"></button>
+
+</div>
+
+
+<div class="modal-body">
+
+<div class="table-responsive">
+
+<table class="table table-striped table-hover align-middle">
+
+<thead class="table-dark">
+
+<tr>
+
+<th>Mwanafunzi</th>
+
+<th>Test 1</th>
+
+<th>Test 2</th>
+
+<th>Type of Exam</th>
+
+<th>Exam Marks</th>
+
+<th>Total</th>
+
+<th>Average</th>
+
+<th>Grade</th>
+
+</tr>
+
+</thead>
+
+
+<tbody>
+
+{% for student in students %}
+
+<tr>
+
+<td>
+
+<input type="hidden"
+
+name="student_ids[]"
+
+value="{{ student.id }}">
+
+<i class="fa-solid fa-user"></i>
+
+{{ student.username }}
+
+</td>
+
+
+<td>
+
+<input type="number"
+
+name="test1_{{ student.id }}"
+
+class="form-control mark-input"
+
+min="0"
+
+max="100">
+
+</td>
+
+
+<td>
+
+<input type="number"
+
+name="test2_{{ student.id }}"
+
+class="form-control mark-input"
+
+min="0"
+
+max="100">
+
+</td>
+
+
+<td>
+
+<select
+
+name="exam_type_{{ student.id }}"
+
+class="form-select exam-type-select">
+
+<option value="">-- Chagua Exam --</option>
+
+<option value="Midterm">Midterm</option>
+
+<option value="Terminal">Terminal</option>
+
+<option value="Annual">Annual</option>
+
+</select>
+
+</td>
+
+
+<td>
+
+<input type="number"
+
+name="exam_marks_{{ student.id }}"
+
+class="form-control exam-mark-input"
+
+min="0"
+
+max="100"
+
+disabled>
+
+</td>
+
+
+<td class="total-cell fw-bold">0</td>
+
+<td class="average-cell fw-bold">0</td>
+
+<td class="grade-cell fw-bold text-secondary">Pending</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+<div class="modal-footer">
+
+<button class="btn btn-success" type="submit">
+
+<i class="fa-solid fa-floppy-disk"></i>
+
+Hifadhi Matokeo
+
+</button>
+
+<button class="btn btn-secondary"
+
+data-bs-dismiss="modal">
+
+<i class="fa-solid fa-xmark"></i>
+
+Funga
+
+</button>
+
+</div>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+{% else %}
+
+<p class="text-muted">
+
+<i class="fa-solid fa-circle-info"></i>
+
+Hakuna masomo uliyowekwa bado.
+
+</p>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<!-- Change Password Modal -->
+
+<div class="modal fade" id="changePasswordModal">
+
+<div class="modal-dialog">
+
+<form method="POST" action="/update-password">
+
+<div class="modal-content">
+
+
+<div class="modal-header bg-warning">
+
+<h5 class="modal-title">
+
+<i class="fa-solid fa-key"></i>
+
+Badili Password
+
+</h5>
+
+<button class="btn-close"
+
+data-bs-dismiss="modal"></button>
+
+</div>
+
+
+<div class="modal-body">
+
+<div class="mb-3">
+
+<label class="form-label">
+
+<i class="fa-solid fa-lock"></i>
+
+Password ya Zamani
+
+</label>
+
+<input type="password"
+
+name="old_password"
+
+class="form-control"
+
+required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+
+<i class="fa-solid fa-lock"></i>
+
+Password Mpya
+
+</label>
+
+<input type="password"
+
+name="new_password"
+
+class="form-control"
+
+required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">
+
+<i class="fa-solid fa-lock"></i>
+
+Rudia Password Mpya
+
+</label>
+
+<input type="password"
+
+name="confirm_password"
+
+class="form-control"
+
+required>
+
+</div>
+
+</div>
+
+
+<div class="modal-footer">
+
+<button class="btn btn-warning" type="submit">
+
+<i class="fa-solid fa-rotate"></i>
+
+Badili Password
+
+</button>
+
+</div>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+
+
+<!-- JS -->
+
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+<script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+
+
+
+<script>
+
+document.addEventListener("DOMContentLoaded",function(){
+
+
+function getGrade(avg){
+
+if(avg>=75)return{text:"A - Excellent",color:"green"}
+
+if(avg>=65)return{text:"B - Very Good",color:"blue"}
+
+if(avg>=45)return{text:"C - Good",color:"goldenrod"}
+
+if(avg>=30)return{text:"D - Satisfactory",color:"orange"}
+
+return{text:"F - Fail",color:"red"}
+
+}
+
+
+document.querySelectorAll('tbody tr').forEach(function(row){
+
+const test1=row.querySelector('input[name^="test1"]')
+
+const test2=row.querySelector('input[name^="test2"]')
+
+const examSelect=row.querySelector('.exam-type-select')
+
+const exam=row.querySelector('.exam-mark-input')
+
+const total=row.querySelector('.total-cell')
+
+const avg=row.querySelector('.average-cell')
+
+const grade=row.querySelector('.grade-cell')
+
+
+function calc(){
+
+const t1=parseFloat(test1.value)||0
+
+const t2=parseFloat(test2.value)||0
+
+const ex=parseFloat(exam.value)||0
+
+const sum=t1+t2+ex
+
+const average=sum/3
+
+
+total.textContent=sum.toFixed(2)
+
+avg.textContent=average.toFixed(2)
+
+
+const g=getGrade(average)
+
+grade.textContent=g.text
+
+grade.style.color=g.color
+
+}
+
+
+examSelect.addEventListener("change",function(){
+
+if(examSelect.value){
+
+exam.disabled=false
+
+exam.focus()
+
+}else{
+
+exam.disabled=true
+
+exam.value=""
+
+calc()
+
+}
+
+})
+
+
+test1.addEventListener("input",calc)
+
+test2.addEventListener("input",calc)
+
+exam.addEventListener("input",calc)
+
+})
+
+})
+
+</script>
+
+
+</body>
+</html>

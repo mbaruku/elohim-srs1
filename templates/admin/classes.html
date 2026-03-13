@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+  <meta charset="UTF-8">
+  <title>Madarasa na Wanafunzi</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+</head>
+<body>
+  <div class="container mt-4">
+    <h2 class="mb-4">Madarasa na Combination</h2>
+
+    <div class="accordion" id="classAccordion">
+      {% for class_key, students in grouped_students.items() %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="heading{{ loop.index }}">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                  Data-bs-target="#collapse{{ loop.index }}" aria-expanded="false"
+                  Aria-controls="collapse{{ loop.index }}">
+            {{ class_key }} ({{ students | length }} wanafunzi)
+          </button>
+        </h2>
+        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
+             Aria-labelledby="heading{{ loop.index }}" data-bs-parent="#classAccordion">
+          <div class="accordion-body">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Jina</th>
+                  <th>Hatua</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for student in students %}
+                <tr>
+                  <td>{{ student.username }}</td>
+                  <td>
+                    <a href="/admin/edit-user/{{ student.id }}" class="btn btn-warning btn-sm">Edit</a>
+                    <form method="POST" action="/admin/delete-user" style="display:inline;">
+                      <input type="hidden" name="username" value="{{ student.username }}">
+                      <button type="submit" class="btn btn-danger btn-sm">Futa</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+  
+</body>
+</html>

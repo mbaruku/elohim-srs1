@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<title>Ingia - Mfumo wa Shule</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+/* spinner */
+.spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
+</head>
+<body>
+
+<div class="login-wrapper">
+<div class="login-card">
+
+<div class="logo">
+<img src="{{ url_for('static', filename='logo.jpeg') }}">
+</div>
+
+<h2>Mfumo wa Matokeo ya Mwanafunzi</h2>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }}">
+{{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<form method="POST">
+<div class="input-group">
+<i class="fa-solid fa-user"></i>
+<input type="text" name="username" placeholder="Jina la mtumiaji" required>
+</div>
+
+<div class="input-group">
+<i class="fa-solid fa-lock"></i>
+<input type="password" id="password" name="password" placeholder="Nenosiri" required>
+<span class="toggle-password" onclick="togglePassword()">
+<i class="fa-solid fa-eye"></i>
+</span>
+</div>
+
+<button type="submit" id="loginBtn">
+<span class="btn-text">Ingia</span>
+<span class="spinner"></span>
+</button>
+</form>
+
+<p class="info">
+Hujaandikishwa bado? Tafadhali wasiliana na uongozi wa shule.
+</p>
+
+</div>
+</div>
+
+<script>
+function togglePassword(){
+    const password = document.getElementById("password")
+    password.type = (password.type === "password") ? "text" : "password"
+}
+
+/* Loading spinner */
+const form = document.querySelector("form")
+const btn = document.getElementById("loginBtn")
+const spinner = btn.querySelector(".spinner")
+const text = btn.querySelector(".btn-text")
+
+form.addEventListener("submit", function(){
+    btn.disabled = true
+    spinner.style.display = "inline-block"
+    text.textContent = "Inaingia..."
+})
+</script>
+
+</body>
+</html>

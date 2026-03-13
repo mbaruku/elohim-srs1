@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <title>Character Assessment - Darasa {{ session['class_level'] }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <style>
+        body { background-color: #f8f9fa; }
+        h2 { margin-top: 20px; margin-bottom: 20px; }
+        table input { width: 120px; }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2>Character Assessment - Darasa {{ session['class_level'] }}</h2>
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="term" class="form-label">Chagua Term</label>
+            <select name="term" id="term" class="form-select" required>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+            </select>
+        </div>
+
+        <table class="table table-bordered table-hover">
+            <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Jina la Mwanafunzi</th>
+                <th>Behavior</th>
+                <th>Discipline</th>
+                <th>Teamwork</th>
+                <th>Leadership</th>
+                <th>Responsibility</th>
+                <th>Punctuality</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for student in students %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ student.full_name or student.username }}</td>
+                    <td><input type="text" name="behavior_{{ student.id }}" class="form-control"></td>
+                    <td><input type="text" name="discipline_{{ student.id }}" class="form-control"></td>
+                    <td><input type="text" name="teamwork_{{ student.id }}" class="form-control"></td>
+                    <td><input type="text" name="leadership_{{ student.id }}" class="form-control"></td>
+                    <td><input type="text" name="responsibility_{{ student.id }}" class="form-control"></td>
+                    <td><input type="text" name="punctuality_{{ student.id }}" class="form-control"></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-success mt-3">Hifadhi Character Assessment</button>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>

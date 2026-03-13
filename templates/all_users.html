@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <title>Orodha ya Watumiaji - ELOHIM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .profile-pic {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 2px solid #dee2e6;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h2 class="text-center mb-4">Orodha ya Watumiaji</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Funga"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <ul class="nav nav-tabs mb-4" id="userTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="teachers-tab" data-bs-toggle="tab" data-bs-target="#teachers" type="button" role="tab">Walimu</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="students-tab" data-bs-toggle="tab" data-bs-target="#students" type="button" role="tab">Wanafunzi</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="userTabsContent">
+            <!-- Walimu -->
+            <div class="tab-pane fade show active" id="teachers" role="tabpanel">
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    {% for teacher in teachers %}
+                    <div class="col">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body d-flex align-items-center">
+                                <img src="{{ url_for('static', filename='uploads/' + (teacher.profile_pic or 'default.png')) }}" class="profile-pic me-3" alt="Picha ya Mwalimu">
+                                <div>
+                                    <h5 class="card-title mb-1">{{ teacher.username }}</h5>
+                                    <p class="card-text mb-0"><strong>Somo:</strong></p>
+                                    <ul class="mb-0">
+                                        {% for subject in teacher.subjects %}
+                                            <li>{{ subject.subject }} (Darasa {{ subject.class_level }})</li>
+                                        {% else %}
+                                            <li><em>Hakuna somo lililowekwa</em></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Wanafunzi -->
+            <div class="tab-pane fade" id="students" role="tabpanel">
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    {% for student in students %}
+                    <div class="col">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body d-flex align-items-center">
+                                <img src="{{ url_for('static', filename='uploads/' + (student.profile_pic or 'default.png')) }}" class="profile-pic me-3" alt="Picha ya Mwanafunzi">
+                                <div>
+                                    <h5 class="card-title mb-1">{{ student.username }}</h5>
+                                    <p class="card-text mb-0"><strong>Darasa:</strong> {{ student.class_level or 'Haijawekwa' }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">⟵ Rudi kwenye Dashibodi</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

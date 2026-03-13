@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="sw">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Hariri Mwalimu</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/select2.min.css') }}">
+</head>
+
+<body>
+
+  <div class="container mt-5">
+    <div class="card shadow border-0">
+      <div class="card-body">
+        <h2 class="mb-4 text-primary">✏️ Hariri Taarifa za 
+          {% if role == 'teacher' %}Mwalimu {% else %}Mwanafunzi{% endif %}
+        </h2>
+
+        <form method="POST">
+
+          <div class="mb-3">
+            <label for="username" class="form-label">👤 Jina la Mtumiaji</label>
+            <input type="text" id="username" name="username" class="form-control" value="{{ user.username }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="class_level" class="form-label">🏫 Darasa</label>
+            <input type="text" id="class_level" name="class_level" class="form-control" value="{{ user.class_level }}">
+          </div>
+         
+          {% if role == 'student' %}
+          <div class="mb-3">
+            <label for="combination" class="form-label">📘 Combination</label>
+            <input type="text" id="combination" name="combination" class="form-control" value="{{ user.combination }}">
+          </div>
+          {% endif %}
+
+          {% if role == 'teacher' %}
+          <div class="mb-3">
+            <label class="form-label">📚 Masomo Anayofundisha</label>
+            <select class="form-select" name="subjects[]" id="subjects" multiple>
+              {% for subject in all_subjects %}
+              <option value="{{ subject }}" {% if subject in current_subjects %}selected{% endif %}>
+                {{ subject }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% endif %}
+
+          <div class="d-flex justify-content-between">
+            <a href="{{ url_for('view_all_teachers') }}" class="btn btn-secondary">🔙 Rudi</a>
+            <button type="submit" class="btn btn-success">💾 Hifadhi</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS Libraries -->
+  <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/select2.min.js') }}"></script>
+  <script>
+    $(document).ready(function () {
+      $('#subjects').select2({
+        placeholder: "Chagua au tafuta masomo",
+        width: '100%'
+      });
+    });
+  </script>
+
+</body>
+
+</html>

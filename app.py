@@ -11,13 +11,12 @@ import os
 from sqlalchemy import inspect
 from functools import wraps
 from werkzeug.utils import secure_filename
-from flask import session, redirect, url_for
 from flask import jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, SubjectAssignment,StudentResult, TeacherSubject,StudentProfile,Feedback,Resource,Event
+from models import db, User, SubjectAssignment, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
 from flask_migrate import Migrate
 from collections import defaultdict
-from flask_login import LoginManager,current_user, login_required
+from flask_login import LoginManager, current_user, login_required
 import json
 
 
@@ -37,23 +36,30 @@ ALL_SUBJECTS = [
 ]
 
 app = Flask(__name__)
-# secret key kutoka environment
+
+# SECRET KEY
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
-# database kutoka PostgreSQL (Render sets DATABASE_URL)
+# DATABASE
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+# Initialize db (USI create db mpya)
+db.init_app(app)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Render sets PORT environment variable
-    app.run(host="0.0.0.0", port=port)
+# Flask migrate
+migrate = Migrate(app, db)
 
+# Login manager
 login_manager = LoginManager()
-login_manager.login_view = "login"  # route ya login
+login_manager.login_view = "login"
 login_manager.init_app(app)
+
+
+# Run app
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 #  user_loader function
 @login_manager.user_loader

@@ -43,6 +43,7 @@ PyJWT==2.10.1
 pypdf==6.4.0
 pyphen==0.17.2
 python-dotenv==1.1.1
+python-bidi==0.4.2
 PyYAML==6.0.3
 reportlab==4.4.3
 requests==2.32.4

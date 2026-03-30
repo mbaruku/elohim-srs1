@@ -1,23 +1,22 @@
 from flask import Flask, render_template, request, redirect, session, flash, url_for
-from flask_sqlalchemy import SQLAlchemy
-from flask import make_response
+from flask import make_response, send_file, jsonify
 from xhtml2pdf import pisa
 from io import BytesIO
 from datetime import datetime
-from flask import send_file
 import pdfkit
 import io
 import os
 from sqlalchemy import inspect
 from functools import wraps
 from werkzeug.utils import secure_filename
-from flask import jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, SubjectAssignment, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
-from flask_migrate import Migrate
 from collections import defaultdict
+from flask_migrate import Migrate
 from flask_login import LoginManager, current_user, login_required
 import json
+
+# Import models na db
+from models import db, User, SubjectAssignment, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
 
 
 ALL_SUBJECTS = [
@@ -44,10 +43,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize db (USI create db mpya)
+# Initialize database
 db.init_app(app)
 
-# Flask migrate
+# Migrate
 migrate = Migrate(app, db)
 
 # Login manager
@@ -56,34 +55,33 @@ login_manager.login_view = "login"
 login_manager.init_app(app)
 
 
-# Run app
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
-#  user_loader function
+# Load user
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+# Admin decorator
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'role' not in session or session['role'] != 'admin':
             return redirect(url_for('login'))
         return f(*args, **kwargs)
-    return decorated_function    
-
-db.init_app(app)
-
-migrate = Migrate(app, db)
+    return decorated_function
 
 
+# Create tables automatically
 @app.before_request
 def create_tables():
-    db.create_all()
+    with app.app_context():
+        db.create_all()
 
+
+# Run app
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 @app.route('/add_admin', methods=['GET', 'POST'])
 def add_admin():

@@ -41,7 +41,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # database kutoka PostgreSQL (Render sets DATABASE_URL)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('postgresql://school_user:qaDiFK6r798fmUs2M52O7TxPPFfWOEej@dpg-d6qdcqsr85hc73er909g-a/school_database_afnq')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 

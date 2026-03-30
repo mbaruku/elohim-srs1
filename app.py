@@ -47,6 +47,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))  # Render sets PORT environment variable
+    app.run(host="0.0.0.0", port=port)
+
 login_manager = LoginManager()
 login_manager.login_view = "login"  # route ya login
 login_manager.init_app(app)

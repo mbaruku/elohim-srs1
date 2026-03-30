@@ -97,4 +97,24 @@ class Feedback(db.Model):
 
     message = db.Column(db.Text)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # relationship ya mwanafunzi
+    student = db.relationship("User", backref="feedbacks")
+
+      # notification status
+    is_read = db.Column(db.Boolean, default=False)
+
+
+class Resource(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    file_url = db.Column(db.String(300), nullable=False)  # URL ya PDF
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    video_url = db.Column(db.String(300), nullable=False)  # URL ya video (mp4 / YouTube)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

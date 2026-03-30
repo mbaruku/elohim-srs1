@@ -10,10 +10,11 @@ import io
 import os
 from sqlalchemy import inspect
 from functools import wraps
+from werkzeug.utils import secure_filename
 from flask import session, redirect, url_for
 from flask import jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, SubjectAssignment,StudentResult, TeacherSubject,StudentProfile,Feedback
+from models import db, User, SubjectAssignment,StudentResult, TeacherSubject,StudentProfile,Feedback,Resource,Event
 from flask_migrate import Migrate
 from collections import defaultdict
 from flask_login import LoginManager,current_user, login_required
@@ -36,16 +37,21 @@ ALL_SUBJECTS = [
 ]
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///elohim.db'
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# secret key kutoka environment
+app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
+
+# database kutoka PostgreSQL (Render sets DATABASE_URL)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('postgresql://school_user:qaDiFK6r798fmUs2M52O7TxPPFfWOEej@dpg-d6qdcqsr85hc73er909g-a/school_database_afnq')
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
 
 login_manager = LoginManager()
 login_manager.login_view = "login"  # route ya login
 login_manager.init_app(app)
 
-# 🔹 user_loader function
+#  user_loader function
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -216,17 +222,66 @@ def admin_dashboard():
 
     # Hapa tunatengeneza current month na year
     now = datetime.now()
-    current_month = now.strftime("%B")   # June, July etc
+    current_month = now.strftime("%B")
     current_year = now.year
+
+    # ✅ Hapa tunaongeza users wote ili search/reset password iweze
+    users = User.query.all()
 
     return render_template(
         "admin/dashboard.html",
         class_results=class_results,
         teachers=User.query.filter_by(role='teacher').count(),
         students=User.query.filter_by(role='student').count(),
-        current_month=current_month,   # <<--- Hii ni muhimu
-        current_year=current_year      # <<--- Hii ni muhimu
+        current_month=current_month,
+        current_year=current_year,
+        users=users  # <<--- hii ni muhimu kwa table ya reset password
     )
+
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_PDF = {'pdf'}
+ALLOWED_VIDEO = {'mp4','mov','avi','mkv'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename, allowed):
+    return '.' in filename and filename.rsplit('.',1)[1].lower() in allowed  
+
+
+
+@app.route("/admin/upload-resource", methods=["POST"])
+def upload_resource():
+    title = request.form['title']
+    file = request.files['file']
+    if file and allowed_file(file.filename, ALLOWED_PDF):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        url = url_for('static', filename=f'uploads/{filename}')
+        res = Resource(title=title, file_url=url)
+        db.session.add(res)
+        db.session.commit()
+        # Return JSON for AJAX
+        return jsonify({"status":"success", "title": title, "file_url": url})
+    return jsonify({"status":"error", "message":"Invalid file type. Only PDFs allowed."})
+
+
+@app.route("/admin/upload-event", methods=["POST"])
+def upload_event():
+    title = request.form['title']
+    description = request.form['description']
+    file = request.files['file']
+    if file and allowed_file(file.filename, ALLOWED_VIDEO):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        url = url_for('static', filename=f'uploads/{filename}')
+        ev = Event(title=title, description=description, video_url=url)
+        db.session.add(ev)
+        db.session.commit()
+        return jsonify({"status":"success", "title": title, "video_url": url, "description": description})
+    return jsonify({"status":"error", "message":"Invalid file type. Only videos allowed."})       
+
 
 @app.route("/admin/add-teacher", methods=["POST"])
 @admin_required
@@ -537,111 +592,58 @@ from datetime import datetime
 
 @app.route('/student')
 def student_dashboard():
-
     if 'role' not in session or session['role'] != 'student':
         return redirect('/login')
 
     student_id = session['user_id']
     student = User.query.get(student_id)
 
-    # Matokeo ya mwanafunzi
+    # Matokeo
     results = StudentResult.query.filter_by(student_id=student_id).all()
-
-    # Je matokeo yameapprove
     approved = any(r.approved for r in results)
+    exam_type = next((r.exam_type for r in results if r.exam_type), None)
 
-    # pata exam type kutoka kwenye result yoyote
-    exam_type = None
-    for r in results:
-        if r.exam_type:
-            exam_type = r.exam_type
-            break
-
-    # Jumla ya wanafunzi wa darasa
-    total_students = User.query.filter_by(
-        class_level=student.class_level,
-        role='student'
-    ).count()
-
-    # Rank calculation
-    class_results = StudentResult.query.filter_by(
-        class_level=student.class_level,
-        approved=True
-    ).all()
-
+    # Rank
+    total_students = User.query.filter_by(class_level=student.class_level, role='student').count()
+    class_results = StudentResult.query.filter_by(class_level=student.class_level, approved=True).all()
     scores_by_student = {}
-
     for r in class_results:
         scores_by_student.setdefault(r.student_id, 0)
         scores_by_student[r.student_id] += r.total or 0
+    sorted_students = sorted(scores_by_student.items(), key=lambda x: x[1], reverse=True)
+    rank = next((i+1 for i,(sid,_) in enumerate(sorted_students) if sid==student_id), None)
 
-    sorted_students = sorted(
-        scores_by_student.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    rank = next(
-        (i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id),
-        None
-    )
-
-    # Remarks
-    grade_remarks = {
-        "A": "Excellent",
-        "B": "Very Good",
-        "C": "Good",
-        "D": "Fair",
-        "F": "Fail"
-    }
-
+    # Remarks & division
+    grade_remarks = {"A":"Excellent","B":"Very Good","C":"Good","D":"Fair","F":"Fail"}
     for r in results:
         r.remarks = grade_remarks.get(r.grade, "-")
         r.can_view = r.approved
 
-    # Division calculation
-    points_map = {"A": 1, "B": 2, "C": 3, "D": 4, "F": 5}
+    points_map = {"A":1,"B":2,"C":3,"D":4,"F":5}
+    total_points = sum([points_map.get(r.grade,0) for r in results if r.approved])
+    if 7 <= total_points <= 17: division="I"
+    elif 18 <= total_points <= 22: division="II"
+    elif 23 <= total_points <= 25: division="III"
+    elif 26 <= total_points <= 33: division="IV"
+    elif total_points >= 34: division="V"
+    else: division=None
 
-    total_points = sum(
-        [points_map.get(r.grade, 0) for r in results if r.approved]
-    )
+    # PROFILE
+    profile_data = {
+        "requirements": json.loads(student.profile.requirements or "[]") if student.profile else [],
+        "dorm_items": json.loads(student.profile.dorm_items or "[]") if student.profile else [],
+        "term": student.profile.term if student.profile else None,
+        "school_fees": student.profile.school_fees if student.profile else None,
+        "other_contributions": student.profile.other_contributions if student.profile else "",
+        "character_assessment": json.loads(student.profile.character_assessment or "{}") if student.profile else {},
+        "health_state": student.profile.health_state if student.profile else ""
+    }
 
-    if 7 <= total_points <= 17:
-        division = "I"
-    elif 18 <= total_points <= 22:
-        division = "II"
-    elif 23 <= total_points <= 25:
-        division = "III"
-    elif 26 <= total_points <= 33:
-        division = "IV"
-    elif total_points >= 34:
-        division = "0"
-    else:
-        division = None
+    # Resources & Events
+    resources = Resource.query.all()   # PDF resources
+    events = Event.query.order_by(Event.created_at.desc()).all()  # Latest videos first
 
-    # PROFILE DATA
-    if student.profile:
-        profile_data = {
-            "requirements": json.loads(student.profile.requirements or "[]"),
-            "dorm_items": json.loads(student.profile.dorm_items or "[]"),
-            "term": student.profile.term,
-            "school_fees": student.profile.school_fees,
-            "other_contributions": student.profile.other_contributions,
-            "character_assessment": json.loads(student.profile.character_assessment or "{}"),
-            "health_state": student.profile.health_state
-        }
-    else:
-        profile_data = {
-            "requirements": [],
-            "dorm_items": [],
-            "term": None,
-            "school_fees": None,
-            "other_contributions": "",
-            "character_assessment": {},
-            "health_state": ""
-        }
-
-    # Month & Year automatic
+    # Month & Year
     now = datetime.now()
     exam_month = now.strftime("%B")
     exam_year = now.year
@@ -657,7 +659,9 @@ def student_dashboard():
         profile=profile_data,
         exam_type=exam_type,
         exam_month=exam_month,
-        exam_year=exam_year
+        exam_year=exam_year,
+        resources=resources,   # << New
+        events=events          # << New
     )
 @app.route("/fix-students-set-class")
 def fix_students_set_class():
@@ -803,6 +807,7 @@ def is_class_teacher():
 
 @app.route("/teacher/class-teacher-dashboard")
 def class_teacher_dashboard():
+
     # Hakikisha user ana-login
     if "role" not in session or session["role"] != "teacher":
         return redirect("/login")
@@ -814,33 +819,46 @@ def class_teacher_dashboard():
     teacher_id = session.get("user_id")
     teacher = User.query.get(teacher_id)
 
-    # Vuta masomo yote mwalimu huyu anafundisha (TeacherSubject)
+    # Masomo anayofundisha
     subjects = TeacherSubject.query.filter_by(teacher_id=teacher_id).all()
 
-    # Pata madarasa yote anayofundisha
+    # Madarasa anayofundisha
     class_levels = list(set([s.class_level for s in subjects]))
 
-    # Pata wanafunzi wa madarasa hayo
+    # Wanafunzi wa madarasa hayo
     students = User.query.filter(
         User.role == "student",
         User.class_level.in_(class_levels)
     ).all()
 
-    # Optional: statistics / debug
-    print("Class Teacher:", teacher.username)
-    print("Class levels:", class_levels)
-    print("Students found:", [s.username for s in students])
+    # ⭐ PATA FEEDBACK ZA WANAFUNZI
+    student_ids = [s.id for s in students]
+
+    feedbacks = Feedback.query.filter(
+        Feedback.student_id.in_(student_ids)
+    ).order_by(Feedback.created_at.desc()).all()
+
+    # ⭐ HESABU FEEDBACK MPYA (NOTIFICATION)
+    unread_feedback = Feedback.query.filter(
+        Feedback.student_id.in_(student_ids),
+        Feedback.is_read == False
+    ).count()
+
+    # ⭐ MARK FEEDBACK ZOTE ZIWE READ
+    for fb in feedbacks:
+        fb.is_read = True
+
+    db.session.commit()
 
     return render_template(
         "teacher/class-teacher-dashboard.html",
         teacher=teacher,
         subjects=subjects,
         students=students,
-        class_teacher=True  # template inaweza kutumia hii flag
+        feedbacks=feedbacks,
+        unread_feedback=unread_feedback,
+        class_teacher=True
     )
-
-
-
 @app.route('/admin/approve-student/<int:student_id>', methods=['POST'])
 def approve_student(student_id):
     # pata matokeo yote ya student hayajapewa approve
@@ -915,22 +933,24 @@ def save_student_requirements():
 
 
 @app.route("/send-feedback", methods=["POST"])
-@login_required
 def send_feedback():
+
+    if "user_id" not in session:
+        return redirect("/login")
 
     message = request.form.get("message")
 
     feedback = Feedback(
-        student_id=current_user.id,
+        student_id=session["user_id"],
         message=message
     )
 
     db.session.add(feedback)
     db.session.commit()
 
-    flash("Maoni yametumwa kwa admin", "success")
+    flash("Feedback imetumwa")
 
-    return redirect(url_for("student_dashboard")) 
+    return redirect("/student")
 
 
 @app.route("/update-password", methods=["POST"])
@@ -978,8 +998,41 @@ def admin_update_password():
 
     flash("Password imebadilishwa vizuri")
 
-    return redirect("/admin")    
-  
+    return redirect("/admin")  
+
+
+@app.route("/teacher/delete-feedback/<int:id>", methods=["POST"])
+def delete_feedback(id):
+
+    feedback = Feedback.query.get_or_404(id)
+
+    db.session.delete(feedback)
+
+    db.session.commit()
+
+    flash("Feedback imefutwa")
+
+    return redirect("/teacher/class-teacher-dashboard")  
+
+
+
+@app.route("/admin/reset-password/<int:user_id>", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    user = User.query.get_or_404(user_id)
+
+    # Tumia third name kama default password
+    # Assuming full_name ina format "First Middle Last"
+    third_name = user.full_name.split()[-1] if user.full_name else "password123"
+
+    # Set new password
+    user.set_password(third_name)
+    db.session.commit()
+
+    flash(f"Password ya {user.username} ime-reset kuwa '{third_name}'", "success")
+    return redirect("/admin")
+
+
 
 
 if __name__ == "__main__":

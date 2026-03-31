@@ -41,6 +41,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -79,9 +80,7 @@ def create_tables():
 
 
 # Run app
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+
 
 @app.route('/add_admin', methods=['GET', 'POST'])
 def add_admin():
@@ -246,14 +245,16 @@ def admin_dashboard():
         users=users  # <<--- hii ni muhimu kwa table ya reset password
     )
 
-UPLOAD_FOLDER = 'static/uploads'
+
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+
 ALLOWED_PDF = {'pdf'}
 ALLOWED_VIDEO = {'mp4','mov','avi','mkv'}
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-def allowed_file(filename, allowed):
-    return '.' in filename and filename.rsplit('.',1)[1].lower() in allowed  
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER    
 
 
 
@@ -742,18 +743,17 @@ def download_report():
         return redirect('/login')
 
     student_id = session['user_id']
-
     student = User.query.get_or_404(student_id)
 
     results = StudentResult.query.filter_by(student_id=student_id).all()
 
-    # Jumla ya wanafunzi wa darasa hilo
+    # TOTAL STUDENTS
     total_students = User.query.filter_by(
         role='student',
         class_level=student.class_level
     ).count()
 
-    # Hesabu rank
+    # RANK CALCULATION
     all_students = User.query.filter_by(
         role='student',
         class_level=student.class_level
@@ -762,29 +762,59 @@ def download_report():
     scores = []
 
     for s in all_students:
-
         student_results = StudentResult.query.filter_by(student_id=s.id).all()
-
         total_score = sum([r.total or 0 for r in student_results])
-
         scores.append((s.id, total_score))
 
     scores.sort(key=lambda x: x[1], reverse=True)
 
     rank = None
-
     for i, s_tuple in enumerate(scores):
         if s_tuple[0] == student_id:
             rank = i + 1
             break
 
-    # Render template
+    # REMARKS
+    grade_remarks = {
+        "A": "Excellent",
+        "B": "Very Good",
+        "C": "Good",
+        "D": "Fair",
+        "F": "Fail"
+    }
+
+    for r in results:
+        r.remarks = grade_remarks.get((r.grade or "").upper(), "-")
+
+    # DIVISION
+    points_map = {"A":1,"B":2,"C":3,"D":4,"F":5}
+
+    total_points = sum([
+        points_map.get((r.grade or "").upper(),0)
+        for r in results
+    ])
+
+    if 7 <= total_points <= 17:
+        division="I"
+    elif 18 <= total_points <= 22:
+        division="II"
+    elif 23 <= total_points <= 25:
+        division="III"
+    elif 26 <= total_points <= 33:
+        division="IV"
+    elif total_points >= 34:
+        division="V"
+    else:
+        division=None
+
+
     html = render_template(
         'student/student-report.html',
         student=student,
         results=results,
         rank=rank,
-        total_students=total_students
+        total_students=total_students,
+        division=division
     )
 
     pdf = BytesIO()
@@ -803,6 +833,7 @@ def download_report():
     response.headers['Content-Disposition'] = 'inline; filename=student_report.pdf'
 
     return response
+
 
 
 
@@ -1041,7 +1072,10 @@ def admin_reset_password(user_id):
     return redirect("/admin")
 
 
-
-
-if __name__ == "__main__":
+if __name__ == "__main__": 
     app.run(debug=True)
+
+
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 5000))
+#     app.run(host="0.0.0.0", port=port)

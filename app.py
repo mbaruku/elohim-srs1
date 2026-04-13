@@ -6,6 +6,9 @@ from datetime import datetime
 import pdfkit
 import io
 import os
+from collections import defaultdict
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy import inspect
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -16,23 +19,9 @@ from flask_login import LoginManager, current_user, login_required
 import json
 
 # Import models na db
-from models import db, User, SubjectAssignment, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
+from models import db, User, Subject, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
 
 
-ALL_SUBJECTS = [
-    "Mathematics",
-    "English",
-    "Physics",
-    "Chemistry",
-    "Biology",
-    "Geography",
-    "History",
-    "Civics",
-    "Kiswahili",
-    "English Literature",
-    "Business Study",
-    "Historia ya Tanzania na Maadili"
-]
 
 app = Flask(__name__)
 
@@ -40,8 +29,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-# app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -49,6 +38,12 @@ db.init_app(app)
 
 # Migrate
 migrate = Migrate(app, db)
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 # Login manager
 login_manager = LoginManager()
@@ -154,7 +149,7 @@ def logout():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    # Map DB class names to frontend keys
+
     class_map = {
         "Form One": "Form1",
         "Form Two": "Form2",
@@ -166,31 +161,41 @@ def admin_dashboard():
     class_results = {}
 
     for form in forms:
-        frontend_class = class_map[form]
 
-        students = User.query.filter_by(role='student', class_level=form).all()
+        students = User.query.filter_by(
+            role='student',
+            class_level=form
+        ).all()
 
-        # All subjects assigned for this class
-        subjects_query = db.session.query(TeacherSubject.subject)\
-            .filter_by(class_level=form).distinct().all()
-        subjects = [s[0] for s in subjects_query]
+        # 🔥 subjects per class (cleaned + ordered)
+        subjects = TeacherSubject.query.filter_by(
+            class_level=form
+        ).distinct(TeacherSubject.subject).all()
+
+        subjects = [s.subject for s in subjects]
 
         rows = []
+
         for student in students:
+
             marks = {}
             total_points = 0
             valid_grades_count = 0
 
             for subject in subjects:
+
                 r = StudentResult.query.filter_by(
                     student_id=student.id,
                     subject=subject,
                     class_level=form,
                     approved=False
                 ).first()
+
                 if r:
                     marks[subject] = r
-                    grade_points = {'A':1,'B':2,'C':3,'D':4,'F':5}
+
+                    grade_points = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'F': 5}
+
                     if r.grade in grade_points:
                         total_points += grade_points[r.grade]
                         valid_grades_count += 1
@@ -200,6 +205,7 @@ def admin_dashboard():
             complete = all(marks[s] is not None for s in subjects) and len(subjects) > 0
 
             if complete and valid_grades_count > 0:
+
                 if 7 <= total_points <= 17:
                     division = "I"
                 elif 18 <= total_points <= 22:
@@ -222,18 +228,30 @@ def admin_dashboard():
                 "division": division
             })
 
-        class_results[frontend_class] = {
+        class_results[class_map[form]] = {
             "subjects": subjects,
             "rows": rows
         }
 
-    # Hapa tunatengeneza current month na year
     now = datetime.now()
     current_month = now.strftime("%B")
     current_year = now.year
 
-    # ✅ Hapa tunaongeza users wote ili search/reset password iweze
     users = User.query.all()
+
+    # 🔥 ALL SUBJECTS (FOR ACCORDION GROUPING)
+    all_subjects = Subject.query.order_by(
+        Subject.class_level,
+        Subject.name
+    ).all()
+
+    # GROUP BY CLASS (IMPORTANT FOR YOUR NEW UI)
+    from collections import defaultdict
+
+    grouped_subjects = defaultdict(list)
+
+    for s in all_subjects:
+        grouped_subjects[s.class_level].append(s)
 
     return render_template(
         "admin/dashboard.html",
@@ -242,9 +260,12 @@ def admin_dashboard():
         students=User.query.filter_by(role='student').count(),
         current_month=current_month,
         current_year=current_year,
-        users=users  # <<--- hii ni muhimu kwa table ya reset password
-    )
+        users=users,
 
+        # 🔥 NEW CLEAN STRUCTURE
+        subjects=all_subjects,
+        subjects_grouped=grouped_subjects
+    )
 
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -380,7 +401,6 @@ def add_student():
 
     flash("Mwanafunzi ameongezwa pamoja na masomo yake", "success")
     return redirect("/admin")
-
 @app.route('/admin/delete-user', methods=['POST'])
 @admin_required
 def delete_user():
@@ -389,10 +409,24 @@ def delete_user():
 
     if not user:
         flash('Mtumiaji hakupatikana', 'danger')
-    else:
-        db.session.delete(user)  # 🚀 Automatically inafuta na subjects zake kama ni mwalimu
+        return redirect('/admin')
+
+    try:
+        #  1. Delete student results (important safety net)
+        StudentResult.query.filter_by(student_id=user.id).delete()
+
+        #  2. Delete profile
+        StudentProfile.query.filter_by(student_id=user.id).delete()
+
+        #  3. Delete user itself
+        db.session.delete(user)
+
         db.session.commit()
         flash(f'Mtumiaji {username} amefutwa', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'danger')
 
     return redirect('/admin')
 
@@ -613,49 +647,80 @@ def student_dashboard():
     exam_type = next((r.exam_type for r in results if r.exam_type), None)
 
     # Rank
-    total_students = User.query.filter_by(class_level=student.class_level, role='student').count()
-    class_results = StudentResult.query.filter_by(class_level=student.class_level, approved=True).all()
+    total_students = User.query.filter_by(
+        class_level=student.class_level,
+        role='student'
+    ).count()
+
+    class_results = StudentResult.query.filter_by(
+        class_level=student.class_level,
+        approved=True
+    ).all()
+
     scores_by_student = {}
     for r in class_results:
         scores_by_student.setdefault(r.student_id, 0)
         scores_by_student[r.student_id] += r.total or 0
+
     sorted_students = sorted(scores_by_student.items(), key=lambda x: x[1], reverse=True)
-    rank = next((i+1 for i,(sid,_) in enumerate(sorted_students) if sid==student_id), None)
+    rank = next((i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id), None)
 
     # Remarks & division
-    grade_remarks = {"A":"Excellent","B":"Very Good","C":"Good","D":"Fair","F":"Fail"}
+    grade_remarks = {
+        "A": "Excellent",
+        "B": "Very Good",
+        "C": "Good",
+        "D": "Fair",
+        "F": "Fail"
+    }
+
     for r in results:
         r.remarks = grade_remarks.get(r.grade, "-")
         r.can_view = r.approved
 
-    points_map = {"A":1,"B":2,"C":3,"D":4,"F":5}
-    total_points = sum([points_map.get(r.grade,0) for r in results if r.approved])
-    if 7 <= total_points <= 17: division="I"
-    elif 18 <= total_points <= 22: division="II"
-    elif 23 <= total_points <= 25: division="III"
-    elif 26 <= total_points <= 33: division="IV"
-    elif total_points >= 34: division="V"
-    else: division=None
+    # Points & Division
+    points_map = {"A": 1, "B": 2, "C": 3, "D": 4, "F": 5}
+    total_points = sum([points_map.get(r.grade, 0) for r in results if r.approved])
+
+    if 7 <= total_points <= 17:
+        division = "I"
+    elif 18 <= total_points <= 22:
+        division = "II"
+    elif 23 <= total_points <= 25:
+        division = "III"
+    elif 26 <= total_points <= 33:
+        division = "IV"
+    elif total_points >= 34:
+        division = "V"
+    else:
+        division = None
 
     # PROFILE
+    profile = student.profile
+
     profile_data = {
-        "requirements": json.loads(student.profile.requirements or "[]") if student.profile else [],
-        "dorm_items": json.loads(student.profile.dorm_items or "[]") if student.profile else [],
-        "term": student.profile.term if student.profile else None,
-        "school_fees": student.profile.school_fees if student.profile else None,
-        "other_contributions": student.profile.other_contributions if student.profile else "",
-        "character_assessment": json.loads(student.profile.character_assessment or "{}") if student.profile else {},
-        "health_state": student.profile.health_state if student.profile else ""
+        "requirements": json.loads(profile.requirements or "[]") if profile else [],
+        "dorm_items": json.loads(profile.dorm_items or "[]") if profile else [],
+        "term": profile.term if profile else None,
+        "school_fees": profile.school_fees if profile else None,
+        "other_contributions": profile.other_contributions if profile else "",
+        "character_assessment": json.loads(profile.character_assessment or "{}") if profile else {},
+        "health_state": profile.health_state if profile else "",
+        "teacher_remarks": profile.teacher_remarks if profile else ""
     }
 
     # Resources & Events
-    resources = Resource.query.all()   # PDF resources
-    events = Event.query.order_by(Event.created_at.desc()).all()  # Latest videos first
+    resources = Resource.query.all()
+    events = Event.query.order_by(Event.created_at.desc()).all()
 
     # Month & Year
     now = datetime.now()
     exam_month = now.strftime("%B")
     exam_year = now.year
+
+    # ⭐ NEW: TOTAL MARKS & AVERAGE
+    student_total_marks = sum([r.total or 0 for r in results if r.approved])
+    average_marks = student_total_marks / 3 if student_total_marks else 0
 
     return render_template(
         'student/dashboard.html',
@@ -665,12 +730,15 @@ def student_dashboard():
         rank=rank,
         total_students=total_students,
         division=division,
+        total_points=total_points,   # optional (useful for UI)
         profile=profile_data,
         exam_type=exam_type,
         exam_month=exam_month,
         exam_year=exam_year,
-        resources=resources,   # << New
-        events=events          # << New
+        resources=resources,
+        events=events,
+        student_total_marks=student_total_marks,
+        average_marks=average_marks
     )
 @app.route("/fix-students-set-class")
 def fix_students_set_class():
@@ -926,6 +994,7 @@ def save_student_requirements():
 
     student_id = request.form.get("student_id")
     student = User.query.get(student_id)
+
     if not student:
         flash("Mwanafunzi haipo", "danger")
         return redirect(request.referrer)
@@ -934,9 +1003,9 @@ def save_student_requirements():
     requirements = request.form.getlist("requirements[]")
     dorm_items = request.form.getlist("dormitory_items[]")
 
-    # School Fees
+    # School Fees (NOW TEXTAREA)
     term = request.form.get("term")
-    school_fees = request.form.get("school_fees")
+    school_fees = request.form.get("school_fees")  # text now
     other_contributions = request.form.get("other_contributions")
 
     # Character Assessment
@@ -951,12 +1020,17 @@ def save_student_requirements():
     # Health State
     health_state = request.form.get("health_state")
 
-    # Hifadhi kwenye database
+    # Teacher Remarks (NEW)
+    teacher_remarks = request.form.get("teacher_remarks")
+
+    # Get or create profile
     profile = StudentProfile.query.filter_by(student_id=student.id).first()
+
     if not profile:
         profile = StudentProfile(student_id=student.id)
         db.session.add(profile)
 
+    # Save data
     profile.requirements = json.dumps(requirements)
     profile.dorm_items = json.dumps(dorm_items)
     profile.term = term
@@ -965,10 +1039,13 @@ def save_student_requirements():
     profile.character_assessment = json.dumps(char_assess)
     profile.health_state = health_state
 
-    db.session.commit()
-    flash(f"Data ya {student.username} imehifadhiwa!", "success")
-    return redirect(request.referrer)  
+    # NEW FIELD
+    profile.teacher_remarks = teacher_remarks
 
+    db.session.commit()
+
+    flash(f"Data ya {student.username} imehifadhiwa!", "success")
+    return redirect(request.referrer)
 
 
 @app.route("/send-feedback", methods=["POST"])
@@ -1069,6 +1146,85 @@ def admin_reset_password(user_id):
     db.session.commit()
 
     flash(f"Password ya {user.username} ime-reset kuwa '{third_name}'", "success")
+    return redirect("/admin")
+
+
+@app.route("/admin/add-subject", methods=["POST"])
+def add_subject():
+
+    name = request.form.get("subject_name")
+    category = request.form.get("category")
+    class_level = request.form.get("class_level")
+
+    subject = Subject(
+        name=name,
+        category=category,
+        class_level=class_level
+    )
+
+    db.session.add(subject)
+    db.session.commit()
+
+    flash("Subject added successfully", "success")
+
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/delete-subject/<int:id>", methods=["POST"])
+def delete_subject(id):
+
+    subject = Subject.query.get_or_404(id)
+
+    db.session.delete(subject)
+    db.session.commit()
+
+    flash("Subject removed", "success")
+
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/get-subjects")
+def get_subjects():
+
+    class_level = request.args.get("class_level")
+    combination = request.args.get("combination")
+
+    if class_level in ["Form Three", "Form Four"]:
+        subjects = Subject.query.filter(
+            Subject.class_level == class_level,
+            Subject.category.in_([combination.lower(), "both"])
+        ).all()
+    else:
+        subjects = Subject.query.filter_by(class_level=class_level).all()
+
+    return {
+        "subjects": [s.name for s in subjects]
+    }
+
+
+@app.route("/admin/get-all-subjects")
+def get_all_subjects():
+
+    subjects = Subject.query.order_by(Subject.name).all()
+
+    return {
+        "subjects": [s.name for s in subjects]
+    }
+
+@app.route("/admin/update-subject", methods=["POST"])
+def update_subject():
+
+    subject_id = request.form.get("subject_id")
+
+    subject = Subject.query.get_or_404(subject_id)
+
+    subject.name = request.form.get("subject_name")
+    subject.class_level = request.form.get("class_level")
+    subject.category = request.form.get("category")
+
+    db.session.commit()
+
+    flash("Subject updated successfully", "success")
+
     return redirect("/admin")
 
 

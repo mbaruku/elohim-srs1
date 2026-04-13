@@ -1,0 +1,145 @@
+<!-- SUBJECT MANAGEMENT MODAL (ACCORDION STYLE) -->
+<div class="modal fade" id="subjectModal">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-book"></i> Manage Subjects
+        </h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- ADD SUBJECT FORM -->
+        <form method="POST" action="/admin/add-subject" class="mb-4">
+
+          <div class="row">
+
+            <div class="col-md-4">
+              <label class="form-label">Jina la Somo</label>
+              <input type="text" name="subject_name" class="form-control" required>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Darasa</label>
+              <select name="class_level" class="form-control" required>
+                <option value="">-- Chagua Darasa --</option>
+                <option value="Form One">Form One</option>
+                <option value="Form Two">Form Two</option>
+                <option value="Form Three">Form Three</option>
+                <option value="Form Four">Form Four</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Category</label>
+              <select name="category" class="form-control">
+                <option value="Both">Both</option>
+                <option value="Science">Science</option>
+                <option value="Art">Art</option>
+              </select>
+            </div>
+
+          </div>
+
+          <div class="mt-3">
+            <button class="btn btn-success">
+              <i class="fa-solid fa-plus"></i> Ongeza Somo
+            </button>
+          </div>
+
+        </form>
+
+        <hr>
+
+        <h6>Masomo Yaliyopo kwa Madarasa</h6>
+
+        <!-- ACCORDION START -->
+        <div class="accordion" id="subjectAccordion">
+
+          {% for form, group in subjects|groupby('class_level') %}
+
+          <div class="accordion-item">
+
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#collapse{{ loop.index }}">
+                📚 {{ form }}
+              </button>
+            </h2>
+
+            <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
+                 data-bs-parent="#subjectAccordion">
+
+              <div class="accordion-body">
+
+                <div class="table-responsive">
+
+                  <table class="table table-bordered">
+                    <thead class="table-dark">
+                      <tr>
+                        <th>Somo</th>
+                        <th>Category</th>
+                        <th width="160">Action</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {% for subject in group %}
+                      <tr>
+
+                        <td>{{ subject.name }}</td>
+                        <td>{{ subject.category }}</td>
+
+                        <td>
+
+                          <!-- EDIT -->
+                          <button class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#editSubjectModal"
+                            onclick="setEditSubject(
+                              '{{ subject.id }}',
+                              '{{ subject.name }}',
+                              '{{ subject.class_level }}',
+                              '{{ subject.category }}'
+                            )">
+                            <i class="fa-solid fa-pen"></i>
+                          </button>
+
+                          <!-- DELETE -->
+                          <form method="POST"
+                                action="/admin/delete-subject/{{ subject.id }}"
+                                style="display:inline;">
+                            <button class="btn btn-danger btn-sm">
+                              <i class="fa-solid fa-trash"></i>
+                            </button>
+                          </form>
+
+                        </td>
+
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+
+                  </table>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {% endfor %}
+
+        </div>
+        <!-- ACCORDION END -->
+
+      </div>
+    </div>
+  </div>
+</div>

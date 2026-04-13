@@ -8,23 +8,36 @@ from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
 
 
-class User(db.Model, UserMixin):  # 🔹 Ongeza UserMixin hapa
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
-    full_name = db.Column(db.String(150))  # Optional
+    full_name = db.Column(db.String(150))
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False)  # 'admin', 'teacher', 'student'
-    class_level = db.Column(db.String(20))          # Kwa mwanafunzi & mwalimu wa darasa
-    combination = db.Column(db.String(50))          # Kwa mwanafunzi pekee
+    role = db.Column(db.String(20), nullable=False)
+    class_level = db.Column(db.String(20))
+    combination = db.Column(db.String(50))
     is_class_teacher = db.Column(db.Boolean, default=False)
 
-    # Relationships
     subjects = db.relationship(
-        "TeacherSubject", back_populates="teacher", cascade="all, delete", lazy=True
+        "TeacherSubject",
+        back_populates="teacher",
+        cascade="all, delete",
+        lazy=True
     )
 
     profile = db.relationship(
-        "StudentProfile", uselist=False, back_populates="student", cascade="all, delete"
+        "StudentProfile",
+        uselist=False,
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
+
+    # 🔥 ADD THIS (IMPORTANT)
+    results = db.relationship(
+        "StudentResult",
+        backref="student",
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     # 🔒 Password helpers
@@ -53,7 +66,13 @@ class TeacherSubject(db.Model):
 
 class StudentResult(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id', ondelete="CASCADE"),
+        nullable=False
+    )
+
     subject = db.Column(db.String(100), nullable=False)
     class_level = db.Column(db.String(20), nullable=False)
     test1 = db.Column(db.Float, default=0.0)
@@ -65,12 +84,8 @@ class StudentResult(db.Model):
     grade = db.Column(db.String(5))
     approved = db.Column(db.Boolean, default=False)
 
-    # ✅ Add these two
     exam_month = db.Column(db.String(20))
     exam_year = db.Column(db.Integer)
-
-    student = db.relationship('User', backref='results')
-
 # ✅ Student Profile Model
 class StudentProfile(db.Model):
     __tablename__ = "student_profiles"
@@ -78,14 +93,20 @@ class StudentProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
 
-    # Hapa tunahifadhi JSON kwa ease
-    requirements = db.Column(db.Text)          # ["Textbooks","Rim",...]
-    dorm_items = db.Column(db.Text)            # ["Mosquito net", "Bucket", ...]
+    # JSON data
+    requirements = db.Column(db.Text)          
+    dorm_items = db.Column(db.Text)            
     term = db.Column(db.String(20))
-    school_fees = db.Column(db.Integer)
+
+    # CHANGED: now TEXT instead of Integer
+    school_fees = db.Column(db.Text)
+
     other_contributions = db.Column(db.Text)
-    character_assessment = db.Column(db.Text)  # {"discipline":"Good", ...}
+    character_assessment = db.Column(db.Text)
     health_state = db.Column(db.Text)
+
+    # NEW FIELD (Teacher Remarks)
+    teacher_remarks = db.Column(db.Text)
 
     student = db.relationship("User", back_populates="profile")
 
@@ -117,4 +138,20 @@ class Event(db.Model):
     title = db.Column(db.String(150), nullable=False)
     video_url = db.Column(db.String(300), nullable=False)  # URL ya video (mp4 / YouTube)
     description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Subject(db.Model):
+    __tablename__ = "subjects"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    name = db.Column(db.String(100), nullable=False)
+
+    # art / science / both
+    category = db.Column(db.String(20), nullable=False)
+
+    # mfano: Form 1, Form 2, Form 3, Form 4
+    class_level = db.Column(db.String(20), nullable=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,158 +1,186 @@
 <!-- Modal: Ongeza Mwalimu -->
-
 <div class="modal fade" id="addTeacherModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
+<div class="modal-dialog modal-lg">
 
-```
 <form action="/admin/add-teacher" method="POST" id="addTeacherForm">
 
-  <div class="modal-content">
+<div class="modal-content">
 
-    <div class="modal-header">
-      <h5 class="modal-title">➕ Ongeza Mwalimu</h5>
-      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-    </div>
-
-    <div class="modal-body">
-
-      <!-- Username -->
-      <div class="mb-3">
-        <label class="form-label">Jina la Mtumiaji</label>
-
-        <input type="text"
-          class="form-control"
-          name="username"
-          id="teacherUsername"
-          placeholder="Mfano: Juma Ali Said"
-          required>
-
-        <small class="text-muted">
-          Andika majina matatu. Jina la tatu litakuwa password.
-        </small>
-      </div>
-
-      <!-- Class teacher -->
-      <div class="mb-3">
-        <label class="form-label">Darasa (ikiwa ni mwalimu wa darasa)</label>
-
-        <select class="form-control" name="class_level">
-          <option value="">-- Chagua Darasa --</option>
-          <option value="Form One">Form One</option>
-          <option value="Form Two">Form Two</option>
-          <option value="Form Three">Form Three</option>
-          <option value="Form Four">Form Four</option>
-        </select>
-      </div>
-
-      <div class="form-check mb-4">
-        <input class="form-check-input"
-               type="checkbox"
-               name="is_class_teacher">
-
-        <label class="form-check-label">
-          Mwalimu wa Darasa
-        </label>
-      </div>
-
-      <!-- SUBJECT + CLASS TABLE -->
-
-      <label class="form-label">Masomo na Madarasa Anayofundisha</label>
-
-      <table class="table table-bordered" id="subjectTable">
-
-        <thead class="table-light">
-          <tr>
-            <th>Somo</th>
-            <th>Darasa</th>
-            <th width="80">Action</th>
-          </tr>
-        </thead>
-
-        <tbody>
-
-          <tr>
-
-            <td>
-              <select class="form-control" name="subjects[]">
-
-                <option value="">-- Chagua Somo --</option>
-                <option value="Kiswahili">Kiswahili</option>
-                <option value="English Language">English Language</option>
-                <option value="Mathematics">Mathematics</option>
-                <option value="Biology">Biology</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Civics">Civics</option>
-                <option value="History">History</option>
-                <option value="Geography">Geography</option>
-                <option value="Book Keeping">Book Keeping</option>
-                <option value="Business Study">Business Study</option>
-                <option value="Historia ya Tanzania na Maadili">
-                  Historia ya Tanzania na Maadili
-                </option>
-
-              </select>
-            </td>
-
-            <td>
-
-              <select class="form-control" name="classes[]">
-
-                <option value="">-- Chagua Darasa --</option>
-                <option value="Form One">Form One</option>
-                <option value="Form Two">Form Two</option>
-                <option value="Form Three">Form Three</option>
-                <option value="Form Four">Form Four</option>
-
-              </select>
-
-            </td>
-
-            <td class="text-center">
-              <button type="button"
-                      class="btn btn-success btn-sm"
-                      onclick="addRow()">
-                +
-              </button>
-            </td>
-
-          </tr>
-
-        </tbody>
-
-      </table>
-
-    </div>
-
-    <div class="modal-footer">
-
-      <button type="submit" class="btn btn-primary">
-        💾 Hifadhi
-      </button>
-
-      <button type="button"
-              class="btn btn-secondary"
-              data-bs-dismiss="modal">
-        Funga
-      </button>
-
-    </div>
-
-  </div>
-
-</form>
-```
-
-  </div>
+<div class="modal-header">
+<h5 class="modal-title">➕ Ongeza Mwalimu</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
-<!-- JS -->
+<div class="modal-body">
+
+<!-- Username -->
+<div class="mb-3">
+<label class="form-label">Jina la Mtumiaji</label>
+
+<input type="text"
+class="form-control"
+name="username"
+id="teacherUsername"
+placeholder="Mfano: Juma Ali Said"
+required>
+
+<small class="text-muted">
+Andika majina matatu. Jina la tatu litakuwa password.
+</small>
+
+</div>
+
+<!-- Class teacher -->
+<div class="mb-3">
+
+<label class="form-label">Darasa (ikiwa ni mwalimu wa darasa)</label>
+
+<select class="form-control" name="class_level">
+
+<option value="">-- Chagua Darasa --</option>
+<option value="Form One">Form One</option>
+<option value="Form Two">Form Two</option>
+<option value="Form Three">Form Three</option>
+<option value="Form Four">Form Four</option>
+
+</select>
+
+</div>
+
+<div class="form-check mb-4">
+
+<input class="form-check-input"
+type="checkbox"
+name="is_class_teacher">
+
+<label class="form-check-label">
+Mwalimu wa Darasa
+</label>
+
+</div>
+
+<!-- SUBJECT + CLASS TABLE -->
+
+<label class="form-label">Masomo na Madarasa Anayofundisha</label>
+
+<table class="table table-bordered" id="subjectTable">
+
+<thead class="table-light">
+
+<tr>
+
+<th>Somo</th>
+<th>Darasa</th>
+<th width="80">Action</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+<tr>
+
+<td>
+
+<select class="form-control subject-select" name="subjects[]">
+
+<option value="">Loading subjects...</option>
+
+</select>
+
+</td>
+
+<td>
+
+<select class="form-control" name="classes[]">
+
+<option value="">-- Chagua Darasa --</option>
+<option value="Form One">Form One</option>
+<option value="Form Two">Form Two</option>
+<option value="Form Three">Form Three</option>
+<option value="Form Four">Form Four</option>
+
+</select>
+
+</td>
+
+<td class="text-center">
+
+<button type="button"
+class="btn btn-success btn-sm"
+onclick="addRow()">
+
++
+
+</button>
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+<div class="modal-footer">
+
+<button type="submit" class="btn btn-primary">
+💾 Hifadhi
+</button>
+
+<button type="button"
+class="btn btn-secondary"
+data-bs-dismiss="modal">
+
+Funga
+
+</button>
+
+</div>
+
+</div>
+
+</form>
+
+</div>
+</div>
 
 <script>
 
+let subjectOptions = ""
+
+function loadSubjects(){
+
+fetch("/admin/get-all-subjects")
+
+.then(res => res.json())
+
+.then(data => {
+
+subjectOptions = '<option value="">-- Chagua Somo --</option>'
+
+data.subjects.forEach(sub => {
+
+subjectOptions += `<option value="${sub}">${sub}</option>`
+
+})
+
+document.querySelectorAll(".subject-select").forEach(select => {
+
+select.innerHTML = subjectOptions
+
+})
+
+})
+
+}
+
 function addRow(){
 
-let table = document.getElementById("subjectTable")
+let table = document.getElementById("subjectTable").getElementsByTagName("tbody")[0]
 
 let row = table.insertRow()
 
@@ -160,23 +188,9 @@ row.innerHTML = `
 
 <td>
 
-<select class="form-control" name="subjects[]">
+<select class="form-control subject-select" name="subjects[]">
 
-<option value="">-- Chagua Somo --</option>
-<option value="Kiswahili">Kiswahili</option>
-<option value="English Language">English Language</option>
-<option value="Mathematics">Mathematics</option>
-<option value="Biology">Biology</option>
-<option value="Physics">Physics</option>
-<option value="Chemistry">Chemistry</option>
-<option value="Civics">Civics</option>
-<option value="History">History</option>
-<option value="Geography">Geography</option>
-<option value="Book Keeping">Book Keeping</option>
-<option value="Business Study">Business Study</option>
-<option value="Historia ya Tanzania na Maadili">
-Historia ya Tanzania na Maadili
-</option>
+${subjectOptions}
 
 </select>
 
@@ -202,7 +216,6 @@ Historia ya Tanzania na Maadili
 class="btn btn-danger btn-sm"
 onclick="deleteRow(this)">
 X
-
 </button>
 
 </td>
@@ -211,14 +224,17 @@ X
 
 }
 
-
 function deleteRow(btn){
 
-let row = btn.parentNode.parentNode
-row.remove()
+btn.parentNode.parentNode.remove()
 
 }
 
+document.addEventListener("DOMContentLoaded", function(){
+
+loadSubjects()
+
+})
 
 document.getElementById("addTeacherForm").addEventListener("submit", function(e){
 

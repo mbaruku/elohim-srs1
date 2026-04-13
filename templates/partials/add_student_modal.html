@@ -4,55 +4,95 @@
     <div class="modal-content">
       <form method="POST" action="/admin/add-student" id="addStudentForm">
         <div class="modal-header">
-          <h5 class="modal-title" id="addStudentModalLabel">➕ Ongeza Mwanafunzi</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          <h5 class="modal-title">➕ Ongeza Mwanafunzi</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
+
         <div class="modal-body">
 
           <!-- Username -->
-          <label for="studentUsername">Jina la mtumiaji</label>
-          <input type="text" id="studentUsername" name="username" class="form-control" placeholder="Mfano: Juma Ali Said" required>
-          <small class="text-muted">Andika majina matatu. Jina la tatu litakuwa password.</small>
+          <label>Jina la mtumiaji</label>
+          <input type="text" id="studentUsername" name="username"
+                 class="form-control"
+                 placeholder="Mfano: Juma Ali Said"
+                 required>
+
+          <small class="text-muted">
+            Andika majina matatu. Jina la tatu litakuwa password.
+          </small>
 
           <!-- Auto Password -->
-          <label for="studentPassword" class="mt-2">Neno la siri (limeundwa automatically)</label>
-          <input type="text" id="studentPassword" name="password" class="form-control" readonly>
+          <label class="mt-2">Password (auto generated)</label>
+          <input type="text" id="studentPassword"
+                 name="password"
+                 class="form-control"
+                 readonly>
 
           <!-- Class -->
-          <label for="studentClass" class="mt-2">Darasa</label>
-          <select id="studentClass" name="class_level" class="form-select" required>
+          <label class="mt-2">Darasa</label>
+          <select id="studentClass"
+                  name="class_level"
+                  class="form-select"
+                  required>
+
             <option value="">-- Chagua Darasa --</option>
             <option value="Form One">Form One</option>
             <option value="Form Two">Form Two</option>
             <option value="Form Three">Form Three</option>
             <option value="Form Four">Form Four</option>
+
           </select>
 
           <!-- Combination -->
-          <label for="studentCombination" class="mt-2">Combination</label>
-          <select id="studentCombination" name="combination" class="form-select">
+          <label class="mt-2">Combination</label>
+          <select id="studentCombination"
+                  name="combination"
+                  class="form-select">
+
             <option value="">-- Chagua Combination --</option>
             <option value="Arts">Arts</option>
             <option value="Science">Science</option>
+
           </select>
 
-          <!-- Subjects Table -->
+          <!-- Subjects -->
           <div class="mt-3">
+
             <label>Masomo</label>
-            <select id="studentSubjects" name="subjects[]" class="form-select" multiple></select>
+
+            <select id="studentSubjects"
+                    name="subjects[]"
+                    class="form-select"
+                    multiple>
+
+            </select>
+
+            <small class="text-muted">
+              Masomo yataonekana kulingana na darasa na combination
+            </small>
+
           </div>
 
         </div>
+
         <div class="modal-footer">
-          <button type="submit" class="btn btn-success">➕ Ongeza</button>
+
+          <button type="submit"
+                  class="btn btn-success">
+
+            ➕ Ongeza
+
+          </button>
+
         </div>
+
       </form>
     </div>
   </div>
 </div>
 
-
 <script>
+
 document.addEventListener("DOMContentLoaded", function(){
 
   const usernameInput = document.getElementById("studentUsername");
@@ -61,69 +101,91 @@ document.addEventListener("DOMContentLoaded", function(){
   const comboSelect = document.getElementById("studentCombination");
   const subjectsSelect = document.getElementById("studentSubjects");
 
-  // Map ya masomo kulingana na darasa/combination
-  const subjectsMap = {
-    "Form One": ["Kiswahili","English","Mathematics","Biology","Physics","Chemistry","History","Geography","Business Study"],
-    "Form Two": ["Kiswahili","English","Mathematics","Biology","Physics","Chemistry","History","Geography","Business Study"],
-    "Form Three-Arts": ["Mathematics","Biology","History","English","Business Study","Geography","Kiswahili","Historia ya Tanzania na Maadili","Civics"],
-    "Form Three-Science": ["Physics","Biology","English","Mathematics","Geography","Chemistry","Kiswahili","Business Study","Historia ya Tanzania na Maadili"],
-    "Form Four-Arts": ["Mathematics","Biology","History","English","Business Study","Geography","Kiswahili","Historia ya Tanzania na Maadili","Civics"],
-    "Form Four-Science": ["Physics","Biology","English","Mathematics","Geography","Chemistry","Kiswahili","Business Study","Historia ya Tanzania na Maadili"]
-  };
-
-  // Update password automatically
+  // Auto password kutoka jina la tatu
   usernameInput.addEventListener("blur", function(){
+
     const names = usernameInput.value.trim().split(" ");
+
     if(names.length === 3){
-      passwordInput.value = names[2]; // jina la tatu
-    } else {
+      passwordInput.value = names[2];
+    }else{
       passwordInput.value = "";
     }
+
   });
 
-  // Update subjects when class or combination changes
+  // Fetch subjects kutoka database
   function updateSubjects(){
+
     const cls = classSelect.value;
     const combo = comboSelect.value;
-    let key = cls;
-    if(cls === "Form Three" || cls === "Form Four"){
-      key = cls + "-" + combo; // Form Three-Arts
+
+    if(!cls){
+      subjectsSelect.innerHTML = "";
+      return;
     }
-    const subjects = subjectsMap[key] || [];
 
-    // Clear previous
-    subjectsSelect.innerHTML = "";
+    fetch(`/admin/get-subjects?class_level=${cls}&combination=${combo}`)
 
-    subjects.forEach(sub => {
-      const option = document.createElement("option");
-      option.value = sub;
-      option.text = sub;
-      subjectsSelect.appendChild(option);
+    .then(res => res.json())
+
+    .then(data => {
+
+      subjectsSelect.innerHTML = "";
+
+      data.subjects.forEach(function(subject){
+
+        const option = document.createElement("option");
+
+        option.value = subject;
+        option.text = subject;
+
+        subjectsSelect.appendChild(option);
+
+      });
+
     });
+
   }
 
   classSelect.addEventListener("change", updateSubjects);
   comboSelect.addEventListener("change", updateSubjects);
 
-  // Form submit validation
+  // Validation
   document.getElementById("addStudentForm").addEventListener("submit", function(e){
+
     const names = usernameInput.value.trim().split(" ");
+
     if(names.length !== 3){
+
       e.preventDefault();
+
       alert("Username lazima iwe na majina matatu. Mfano: Juma Ali Said");
-      return false;
+
+      return;
+
     }
+
     if(!classSelect.value){
+
       e.preventDefault();
+
       alert("Chagua darasa");
-      return false;
+
+      return;
+
     }
+
     if((classSelect.value === "Form Three" || classSelect.value === "Form Four") && !comboSelect.value){
+
       e.preventDefault();
+
       alert("Chagua combination (Arts/Science) kwa Form 3 na 4");
-      return false;
+
     }
+
   });
 
 });
+
 </script>

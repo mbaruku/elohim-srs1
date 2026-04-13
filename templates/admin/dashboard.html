@@ -120,6 +120,14 @@ data-bs-target="#addStudentModal">
 </button>
 
 
+<button class="btn btn-dark"
+data-bs-toggle="modal"
+data-bs-target="#subjectModal">
+
+<i class="fa-solid fa-book"></i> Manage Subjects
+
+</button>
+
 <!-- <a href="/admin/download-results" class="btn btn-success">
 
 <i class="fa-solid fa-download"></i> Download Results
@@ -164,8 +172,9 @@ Wanafunzi: {{ students }}
 
 
 <!-- INCLUDE MODALS -->
-
 {% include 'partials/add_teacher_modal.html' %}
+{% include 'partials/subject_management_modal.html' %}
+{% include 'partials/edit_subject_modal.html' %}
 {% include 'partials/add_student_modal.html' %}
 {% include 'partials/delete_user_modal.html' %}
 {% include 'partials/logout_modal.html' %}
@@ -699,7 +708,15 @@ $(document).ready(function(){
   });
 });
 
+function setEditSubject(id, name, class_level, category) {
+  document.getElementById("editSubjectId").value = id;
+  document.getElementById("editSubjectName").value = name;
+  document.getElementById("editSubjectClass").value = class_level;
+  document.getElementById("editSubjectCategory").value = category;
 
+  document.getElementById("editSubjectForm").action =
+    "/admin/edit-subject/" + id;
+}
 
 </script>
 

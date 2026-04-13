@@ -402,36 +402,12 @@ School Fees
 
 </h6>
 
-<div class="row mb-3">
+<textarea class="form-control"
+          name="school_fees"
+          id="school_fees_{{ student.id }}"
+          rows="2"
+          placeholder="Andika fees zote au maelezo ya malipo..."></textarea>
 
-<div class="col-md-3">
-
-<select
-class="form-select"
-name="term">
-
-<option value="">Chagua Term</option>
-<option>Term 1</option>
-<option>Term 2</option>
-<option>Term 3</option>
-<option>Term 4</option>
-
-</select>
-
-</div>
-
-
-  <!-- Amount Paid -->
-  <div class="col-md-3">
-    <label for="school_fees_{{ student.id }}" class="form-label">
-      <i class="fa-solid fa-money-bill-wave"></i> Kiasi cha Pesa (Tsh)
-    </label>
-    <input type="number"
-           class="form-control"
-           name="school_fees"
-           id="school_fees_{{ student.id }}"
-           min="0">
-  </div>
 
   <!-- Other Contributions -->
   <div class="col-md-6">
@@ -504,6 +480,30 @@ Health Remarks
           rows="2"></textarea>
 
 </div>
+
+</div>
+
+
+<!-- Teacher Remarks -->
+<h6 class="mt-3">
+  <i class="fa-solid fa-comment-dots"></i> Teacher Remarks
+</h6>
+
+<div class="row mb-3">
+
+  <div class="col-md-12">
+
+    <label for="remarks_{{ student.id }}" class="form-label">
+      Maoni ya Mwalimu kwa Mwanafunzi
+    </label>
+
+    <textarea class="form-control"
+              name="teacher_remarks"
+              id="remarks_{{ student.id }}"
+              rows="3"
+              placeholder="Andika maoni kuhusu mwanafunzi hapa..."></textarea>
+
+  </div>
 
 </div>
 

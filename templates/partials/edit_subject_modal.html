@@ -1,0 +1,97 @@
+<!-- EDIT SUBJECT MODAL -->
+
+<div class="modal fade" id="editSubjectModal">
+
+<div class="modal-dialog">
+
+<div class="modal-content">
+
+<div class="modal-header bg-primary text-white">
+
+<h5 class="modal-title">
+
+<i class="fa-solid fa-pen"></i> Edit Subject
+
+</h5>
+
+<button class="btn-close btn-close-white"
+data-bs-dismiss="modal"></button>
+
+</div>
+
+
+<form method="POST" action="/admin/update-subject">
+
+<div class="modal-body">
+
+<input type="hidden" name="subject_id" id="edit_subject_id">
+
+<div class="mb-3">
+
+<label class="form-label">Jina la Somo</label>
+
+<input type="text"
+name="subject_name"
+id="edit_subject_name"
+class="form-control"
+required>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">Darasa</label>
+
+<select name="class_level"
+id="edit_class_level"
+class="form-control">
+
+<option value="Form One">Form One</option>
+<option value="Form Two">Form Two</option>
+<option value="Form Three">Form Three</option>
+<option value="Form Four">Form Four</option>
+
+</select>
+
+</div>
+
+
+<div class="mb-3">
+
+<label class="form-label">Category</label>
+
+<select name="category"
+id="edit_category"
+class="form-control">
+
+<option value="Both">Both</option>
+<option value="Science">Science</option>
+<option value="Art">Art</option>
+
+</select>
+
+</div>
+
+</div>
+
+
+<div class="modal-footer">
+
+<button class="btn btn-success">
+
+<i class="fa-solid fa-save"></i>
+
+Save Changes
+
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+</div>

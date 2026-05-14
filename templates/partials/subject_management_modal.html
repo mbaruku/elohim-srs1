@@ -1,145 +1,299 @@
-<!-- SUBJECT MANAGEMENT MODAL (ACCORDION STYLE) -->
-<div class="modal fade" id="subjectModal">
-  <div class="modal-dialog modal-lg">
+<!-- BULK ADD SUBJECT MODAL -->
+<div class="modal fade" id="bulkSubjectModal" tabindex="-1">
+
+  <div class="modal-dialog modal-xl">
+
     <div class="modal-content">
 
-      <div class="modal-header bg-dark text-white">
+      <!-- HEADER -->
+      <div class="modal-header bg-primary text-white">
         <h5 class="modal-title">
-          <i class="fa-solid fa-book"></i> Manage Subjects
+          <i class="fa-solid fa-layer-group"></i> Manage Subjects
         </h5>
-        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
 
-      <div class="modal-body">
+      <!-- FORM -->
+      <form method="POST" action="/admin/add-subject-bulk">
 
-        <!-- ADD SUBJECT FORM -->
-        <form method="POST" action="/admin/add-subject" class="mb-4">
+        <div class="modal-body">
 
           <div class="row">
 
-            <div class="col-md-4">
-              <label class="form-label">Jina la Somo</label>
-              <input type="text" name="subject_name" class="form-control" required>
+            <!-- SUBJECTS -->
+            <div class="col-md-6">
+              <label class="form-label"><b>Masomo (andika mengi)</b></label>
+
+              <textarea name="subjects" class="form-control" rows="6"
+              placeholder="Maths
+English
+Biology
+Physics
+Chemistry" required></textarea>
+
+              <small class="text-muted">
+                Andika kila somo kwenye line 
+              </small>
             </div>
 
-            <div class="col-md-4">
-              <label class="form-label">Darasa</label>
-              <select name="class_level" class="form-control" required>
-                <option value="">-- Chagua Darasa --</option>
-                <option value="Form One">Form One</option>
-                <option value="Form Two">Form Two</option>
-                <option value="Form Three">Form Three</option>
-                <option value="Form Four">Form Four</option>
-              </select>
-            </div>
+            <!-- CLASSES -->
+            <div class="col-md-6">
 
-            <div class="col-md-4">
-              <label class="form-label">Category</label>
-              <select name="category" class="form-control">
-                <option value="Both">Both</option>
-                <option value="Science">Science</option>
-                <option value="Art">Art</option>
-              </select>
-            </div>
+              <label class="form-label"><b>Madarasa</b></label>
 
-          </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="classes" value="Form One" checked>
+                <label class="form-check-label">Form One</label>
+              </div>
 
-          <div class="mt-3">
-            <button class="btn btn-success">
-              <i class="fa-solid fa-plus"></i> Ongeza Somo
-            </button>
-          </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="classes" value="Form Two" checked>
+                <label class="form-check-label">Form Two</label>
+              </div>
 
-        </form>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="classes" value="Form Three" checked>
+                <label class="form-check-label">Form Three</label>
+              </div>
 
-        <hr>
-
-        <h6>Masomo Yaliyopo kwa Madarasa</h6>
-
-        <!-- ACCORDION START -->
-        <div class="accordion" id="subjectAccordion">
-
-          {% for form, group in subjects|groupby('class_level') %}
-
-          <div class="accordion-item">
-
-            <h2 class="accordion-header">
-              <button class="accordion-button collapsed" type="button"
-                      data-bs-toggle="collapse"
-                      data-bs-target="#collapse{{ loop.index }}">
-                📚 {{ form }}
-              </button>
-            </h2>
-
-            <div id="collapse{{ loop.index }}" class="accordion-collapse collapse"
-                 data-bs-parent="#subjectAccordion">
-
-              <div class="accordion-body">
-
-                <div class="table-responsive">
-
-                  <table class="table table-bordered">
-                    <thead class="table-dark">
-                      <tr>
-                        <th>Somo</th>
-                        <th>Category</th>
-                        <th width="160">Action</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {% for subject in group %}
-                      <tr>
-
-                        <td>{{ subject.name }}</td>
-                        <td>{{ subject.category }}</td>
-
-                        <td>
-
-                          <!-- EDIT -->
-                          <button class="btn btn-primary btn-sm"
-                            data-bs-toggle="modal"
-                            data-bs-target="#editSubjectModal"
-                            onclick="setEditSubject(
-                              '{{ subject.id }}',
-                              '{{ subject.name }}',
-                              '{{ subject.class_level }}',
-                              '{{ subject.category }}'
-                            )">
-                            <i class="fa-solid fa-pen"></i>
-                          </button>
-
-                          <!-- DELETE -->
-                          <form method="POST"
-                                action="/admin/delete-subject/{{ subject.id }}"
-                                style="display:inline;">
-                            <button class="btn btn-danger btn-sm">
-                              <i class="fa-solid fa-trash"></i>
-                            </button>
-                          </form>
-
-                        </td>
-
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-
-                  </table>
-
-                </div>
-
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="classes" value="Form Four" checked>
+                <label class="form-check-label">Form Four</label>
               </div>
 
             </div>
 
           </div>
 
-          {% endfor %}
+          <!-- CATEGORY -->
+          <div class="mt-3">
+            <label class="form-label"><b>Category</b></label>
 
-        </div>
-        <!-- ACCORDION END -->
+            <select name="category" class="form-control">
+              <option value="Both">Both</option>
+              <option value="Science">Science</option>
+              <option value="Art">Art</option>
+            </select>
+          </div>
+
+          <hr>
+
+          <!-- SUBJECT LIST -->
+          <h5 class="mt-4">
+            <i class="fa-solid fa-book"></i> Masomo Yaliyopo kwa Madarasa
+          </h5>
+
+          <!-- ACCORDION -->
+          <div class="accordion" id="subjectsAccordion">
+
+{% set classes = ["Form One", "Form Two", "Form Three", "Form Four"] %}
+
+{% for cls in classes %}
+
+<div class="accordion-item">
+
+  <h2 class="accordion-header">
+    <button class="accordion-button collapsed"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#collapse{{ loop.index }}">
+      📚 {{ cls }}
+    </button>
+  </h2>
+
+  <div id="collapse{{ loop.index }}"
+       class="accordion-collapse collapse"
+       data-bs-parent="#subjectsAccordion">
+
+    <div class="accordion-body">
+
+      <div class="table-responsive">
+
+        <table class="table table-bordered table-hover">
+
+          <thead class="table-dark">
+            <tr>
+              <th>Somo</th>
+              <th>Category</th>
+              <th width="160">Action</th>
+            </tr>
+          </thead>
+
+         <tbody>
+
+{% set class_subjects = [] %}
+
+{% for subject in subjects %}
+  {% if subject.class_level and subject.class_level.strip().lower() == cls.lower() %}
+    {% set _ = class_subjects.append(subject) %}
+  {% endif %}
+{% endfor %}
+
+{% if class_subjects %}
+
+  {% for subject in class_subjects %}
+
+  <tr class="align-middle">
+
+    <td><b>{{ subject.name }}</b></td>
+
+    <td>
+      <span class="badge 
+        {% if subject.category == 'Science' %}bg-info
+        {% elif subject.category == 'Art' %}bg-secondary
+        {% else %}bg-success
+        {% endif %}">
+        {{ subject.category }}
+      </span>
+    </td>
+
+    <td>
+      <button class="btn btn-sm btn-primary"
+        data-bs-toggle="modal"
+        data-bs-target="#editSubjectModal"
+        onclick="setEditSubject(
+          '{{subject.id}}',
+          '{{subject.name}}',
+          '{{subject.class_level}}',
+          '{{subject.category}}'
+        )">
+        <i class="fa-solid fa-pen"></i>
+      </button>
+
+      <form method="POST"
+        action="/admin/delete-subject/{{subject.id}}"
+        style="display:inline"
+        onsubmit="return confirm('Una uhakika unataka kufuta somo hili?')">
+
+        <button class="btn btn-sm btn-danger">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+
+      </form>
+    </td>
+
+  </tr>
+
+  {% endfor %}
+
+{% else %}
+
+<tr>
+  <td colspan="3" class="text-center text-muted">
+    Hakuna masomo kwa {{ cls }}
+  </td>
+</tr>
+
+{% endif %}
+
+</tbody>
+
+        </table>
 
       </div>
+
     </div>
+
   </div>
+
 </div>
+
+{% endfor %}
+
+</div>
+
+        </div>
+
+        <!-- FOOTER -->
+        <div class="modal-footer">
+
+          <button type="submit" class="btn btn-success">
+            <i class="fa-solid fa-plus"></i> Save Subjects
+          </button>
+
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Cancel
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- EDIT SUBJECT MODAL -->
+<div class="modal fade" id="editSubjectModal">
+
+  <div class="modal-dialog">
+
+    <div class="modal-content">
+
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title">
+          <i class="fa-solid fa-pen"></i> Edit Subject
+        </h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="/admin/edit-subject">
+
+        <div class="modal-body">
+
+          <input type="hidden" name="subject_id" id="edit_subject_id">
+
+          <div class="mb-3">
+            <label class="form-label">Jina la Somo</label>
+            <input type="text" name="subject_name" id="edit_subject_name" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Darasa</label>
+            <select name="class_level" id="edit_class_level" class="form-control">
+              <option value="Form One">Form One</option>
+              <option value="Form Two">Form Two</option>
+              <option value="Form Three">Form Three</option>
+              <option value="Form Four">Form Four</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category" id="edit_category" class="form-control">
+              <option value="Both">Both</option>
+              <option value="Science">Science</option>
+              <option value="Art">Art</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-success">
+            <i class="fa-solid fa-save"></i> Save Changes
+          </button>
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- JS -->
+<script>
+function setEditSubject(id, name, class_level, category){
+    document.getElementById("edit_subject_id").value = id;
+    document.getElementById("edit_subject_name").value = name;
+    document.getElementById("edit_class_level").value = class_level;
+    document.getElementById("edit_category").value = category;
+}
+</script>

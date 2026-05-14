@@ -93,29 +93,39 @@ textarea {
                                         <div class="text-end mb-2">
                                             <a href="/student-report" class="btn btn-success"><i class="fa-solid fa-file-pdf"></i> Download Report PDF</a>
                                         </div>
-                                        <table class="table table-bordered table-hover">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Somo</th>
-                                                    <th>Marks</th>
-                                                    <th>Grade</th>
-                                                    <th>Remarks</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for result in results %}
-                                            <tr>
+                                       <table class="table table-bordered table-hover">
+
+<thead class="table-light">
+<tr>
+    <th>Somo</th>
+    <th>Test 1</th>
+    <th>Test 2</th>
+    <th>Pre Test</th>
+    <th>Exam</th>
+    <th>Total</th>
+    <th>Average</th>
+    <th>Grade</th>
+    <th>Remarks</th>
+</tr>
+</thead>
+
+<tbody>
+{% for result in results %}
+<tr>
+
     <td>{{ result.subject }}</td>
 
-    <!-- MARKS -->
-    <td>
-        {{ (result.total / 3) | round(2) }}
-    </td>
+    <td>{{ result.test1 or 0 }}</td>
+    <td>{{ result.test2 or 0 }}</td>
+    <td>{{ result.pre_test or 0 }}</td>
+    <td>{{ result.exam_marks or 0 }}</td>
 
-    <!-- GRADE -->
+    <td>{{ result.total or 0 }}</td>
+
+    <td>{{ result.average | round(2) }}</td>
+
     <td>{{ result.grade }}</td>
 
-    <!-- REMARKS -->
     <td>
         {% set remark = result.remarks|lower %}
         {% if "excellent" in remark %}
@@ -130,11 +140,12 @@ textarea {
             <span class="badge bg-danger">Poor</span>
         {% endif %}
     </td>
+
 </tr>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
+{% endfor %}
+</tbody>
+
+</table>
                                     </div>
 
                                     <div>

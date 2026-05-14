@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Results</title>
+
+<link rel="stylesheet"
+href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+.edit-mode{display:none;}
+</style>
+
+</head>
+
+<body>
+
+<div class="container mt-4">
+
+<h3>Results - {{ subject }}</h3>
+
+<p>
+Class: {{ class_level }} |
+Term: {{ term }} |
+Year: {{ academic_year }}
+</p>
+
+<!-- ACTION BUTTONS -->
+
+<div class="d-flex justify-content-end gap-2 mb-3">
+
+<button class="btn btn-warning" id="editBtn" type="button">
+<i class="fa-solid fa-pen-to-square"></i> Edit Results
+</button>
+
+<button class="btn btn-success d-none" id="saveBtn" type="button">
+<i class="fa-solid fa-floppy-disk"></i> Save Changes
+</button>
+
+<button class="btn btn-primary" type="button" onclick="sendToAdmin()">
+<i class="fa-solid fa-paper-plane"></i> Send to Admin
+</button>
+
+</div>
+
+<form method="POST" action="/teacher/update-results">
+
+<!-- hidden data muhimu kwa backend -->
+
+<input type="hidden" name="subject" value="{{ subject }}">
+<input type="hidden" name="class_level" value="{{ class_level }}">
+<input type="hidden" name="term" value="{{ term }}">
+<input type="hidden" name="academic_year" value="{{ academic_year }}">
+
+<table class="table table-bordered">
+
+<thead class="table-dark">
+
+<tr>
+<th>#</th>
+<th>Student</th>
+
+<th>Test 1</th>
+<th>Test 2</th>
+<th>Pre Test</th>
+<th>Exam</th>
+
+<th>Total</th>
+<th>Average</th>
+<th>Grade</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for r in results %}
+
+<tr>
+
+<td>{{ loop.index }}</td>
+
+<td>{{ r.student.username }}</td>
+
+<!-- TEST 1 -->
+
+<td>
+<span class="view-mode">{{ r.test1 or 0 }}</span>
+
+<input class="form-control edit-mode"
+name="test1_{{ r.id }}"
+value="{{ r.test1 }}">
+</td>
+
+<!-- TEST 2 -->
+
+<td>
+<span class="view-mode">{{ r.test2 or 0 }}</span>
+
+<input class="form-control edit-mode"
+name="test2_{{ r.id }}"
+value="{{ r.test2 }}">
+</td>
+
+<!-- PRE TEST -->
+
+<td>
+<span class="view-mode">{{ r.pre_test or 0 }}</span>
+
+<input class="form-control edit-mode"
+name="pretest_{{ r.id }}"
+value="{{ r.pre_test }}">
+</td>
+
+<!-- EXAM -->
+
+<td>
+<span class="view-mode">{{ r.exam_marks or 0 }}</span>
+
+<input class="form-control edit-mode"
+name="exam_{{ r.id }}"
+value="{{ r.exam_marks }}">
+</td>
+
+<td>{{ r.total }}</td>
+
+<td>{{ r.average|round(2) }}</td>
+
+<td>
+<span class="badge bg-success">{{ r.grade }}</span>
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</form>
+
+<a href="/teacher/download-results?subject={{subject}}&class_level={{class_level}}&term={{term}}&academic_year={{academic_year}}"
+class="btn btn-success">
+Download Results
+</a>
+
+</div>
+
+<script>
+
+/* ================= EDIT MODE ================= */
+
+const editBtn = document.getElementById("editBtn");
+const saveBtn = document.getElementById("saveBtn");
+
+editBtn.addEventListener("click",function(){
+
+document.querySelectorAll(".view-mode").forEach(el=>el.style.display="none");
+
+document.querySelectorAll(".edit-mode").forEach(el=>el.style.display="block");
+
+editBtn.classList.add("d-none");
+saveBtn.classList.remove("d-none");
+
+});
+
+saveBtn.addEventListener("click",function(){
+
+document.querySelector("form").submit();
+
+});
+
+/* ================= SEND TO ADMIN ================= */
+
+function sendToAdmin(){
+
+if(!confirm("Send results to admin for approval?")) return;
+
+fetch("/teacher/send-to-admin",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+subject:"{{ subject }}",
+class_level:"{{ class_level }}",
+term:"{{ term }}",
+year:"{{ academic_year }}"
+
+})
+
+})
+
+.then(res=>res.json())
+.then(data=>alert(data.message))
+.catch(err=>alert("Error sending to admin"))
+
+}
+
+</script>
+
+</body>
+</html>

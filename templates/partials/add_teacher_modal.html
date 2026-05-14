@@ -16,65 +16,48 @@
 <!-- Username -->
 <div class="mb-3">
 <label class="form-label">Jina la Mtumiaji</label>
-
-<input type="text"
-class="form-control"
-name="username"
-id="teacherUsername"
-placeholder="Mfano: Juma Ali Said"
-required>
-
-<small class="text-muted">
-Andika majina matatu. Jina la tatu litakuwa password.
-</small>
-
+<input type="text" class="form-control" name="username" id="teacherUsername" required>
+<small class="text-muted">Majina matatu, la mwisho ndio password</small>
 </div>
 
-<!-- Class teacher -->
+<!-- CLASS TEACHER -->
 <div class="mb-3">
-
 <label class="form-label">Darasa (ikiwa ni mwalimu wa darasa)</label>
-
 <select class="form-control" name="class_level">
-
 <option value="">-- Chagua Darasa --</option>
 <option value="Form One">Form One</option>
 <option value="Form Two">Form Two</option>
 <option value="Form Three">Form Three</option>
 <option value="Form Four">Form Four</option>
-
 </select>
-
 </div>
 
 <div class="form-check mb-4">
-
-<input class="form-check-input"
-type="checkbox"
-name="is_class_teacher">
-
-<label class="form-check-label">
-Mwalimu wa Darasa
-</label>
-
+<input class="form-check-input" type="checkbox" name="is_class_teacher">
+<label class="form-check-label">Mwalimu wa Darasa</label>
 </div>
 
-<!-- SUBJECT + CLASS TABLE -->
+<!-- COMBINATION -->
+<div class="mb-3">
+<label class="form-label">Combination (Form 3 & 4 tu)</label>
+<select id="combination" class="form-control">
+<option value="">-- Chagua Combination --</option>
+<option value="Science">Science</option>
+<option value="Art">Art</option>
+</select>
+</div>
 
-<label class="form-label">Masomo na Madarasa Anayofundisha</label>
+<!-- SUBJECT TABLE -->
+<label class="form-label">Masomo na Madarasa</label>
 
 <table class="table table-bordered" id="subjectTable">
 
 <thead class="table-light">
-
 <tr>
-
 <th>Somo</th>
 <th>Darasa</th>
 <th width="80">Action</th>
-
 </tr>
-
 </thead>
 
 <tbody>
@@ -82,39 +65,23 @@ Mwalimu wa Darasa
 <tr>
 
 <td>
-
 <select class="form-control subject-select" name="subjects[]">
-
-<option value="">Loading subjects...</option>
-
+<option>Chagua darasa kwanza</option>
 </select>
-
 </td>
 
 <td>
-
-<select class="form-control" name="classes[]">
-
+<select class="form-control class-select" name="classes[]">
 <option value="">-- Chagua Darasa --</option>
 <option value="Form One">Form One</option>
 <option value="Form Two">Form Two</option>
 <option value="Form Three">Form Three</option>
 <option value="Form Four">Form Four</option>
-
 </select>
-
 </td>
 
 <td class="text-center">
-
-<button type="button"
-class="btn btn-success btn-sm"
-onclick="addRow()">
-
-+
-
-</button>
-
+<button type="button" class="btn btn-success btn-sm" onclick="addRow()">+</button>
 </td>
 
 </tr>
@@ -126,129 +93,119 @@ onclick="addRow()">
 </div>
 
 <div class="modal-footer">
-
-<button type="submit" class="btn btn-primary">
-💾 Hifadhi
-</button>
-
-<button type="button"
-class="btn btn-secondary"
-data-bs-dismiss="modal">
-
-Funga
-
-</button>
-
+<button type="submit" class="btn btn-primary">💾 Hifadhi</button>
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Funga</button>
 </div>
 
 </div>
-
 </form>
-
 </div>
 </div>
 
 <script>
 
-let subjectOptions = ""
+function loadSubjects(classSelect, subjectSelect){
 
-function loadSubjects(){
+    let selectedClass = classSelect.value
+    let combination = document.getElementById("combination").value
 
-fetch("/admin/get-all-subjects")
+    if(!selectedClass){
+        subjectSelect.innerHTML = '<option>Chagua darasa kwanza</option>'
+        return
+    }
 
-.then(res => res.json())
+    fetch(`/admin/get-subjects?class_level=${encodeURIComponent(selectedClass)}&combination=${encodeURIComponent(combination)}`)
 
-.then(data => {
+    .then(res => res.json())
+    .then(data => {
 
-subjectOptions = '<option value="">-- Chagua Somo --</option>'
+        let options = '<option value="">-- Chagua Somo --</option>'
 
-data.subjects.forEach(sub => {
+        data.subjects.forEach(sub => {
+            options += `<option value="${sub}">${sub}</option>`
+        })
 
-subjectOptions += `<option value="${sub}">${sub}</option>`
+        subjectSelect.innerHTML = options
 
-})
-
-document.querySelectorAll(".subject-select").forEach(select => {
-
-select.innerHTML = subjectOptions
-
-})
-
-})
-
+    })
 }
 
 function addRow(){
 
-let table = document.getElementById("subjectTable").getElementsByTagName("tbody")[0]
+    let table = document.querySelector("#subjectTable tbody")
 
-let row = table.insertRow()
+    let row = table.insertRow()
 
-row.innerHTML = `
+    row.innerHTML = `
 
-<td>
+    <td>
+        <select class="form-control subject-select" name="subjects[]">
+            <option>Chagua darasa kwanza</option>
+        </select>
+    </td>
 
-<select class="form-control subject-select" name="subjects[]">
+    <td>
+        <select class="form-control class-select" name="classes[]">
+            <option value="">-- Chagua Darasa --</option>
+            <option value="Form One">Form One</option>
+            <option value="Form Two">Form Two</option>
+            <option value="Form Three">Form Three</option>
+            <option value="Form Four">Form Four</option>
+        </select>
+    </td>
 
-${subjectOptions}
+    <td class="text-center">
+        <button type="button" class="btn btn-danger btn-sm" onclick="deleteRow(this)">X</button>
+    </td>
 
-</select>
-
-</td>
-
-<td>
-
-<select class="form-control" name="classes[]">
-
-<option value="">-- Chagua Darasa --</option>
-<option value="Form One">Form One</option>
-<option value="Form Two">Form Two</option>
-<option value="Form Three">Form Three</option>
-<option value="Form Four">Form Four</option>
-
-</select>
-
-</td>
-
-<td class="text-center">
-
-<button type="button"
-class="btn btn-danger btn-sm"
-onclick="deleteRow(this)">
-X
-</button>
-
-</td>
-
-`
+    `
 
 }
 
 function deleteRow(btn){
-
-btn.parentNode.parentNode.remove()
-
+    btn.closest("tr").remove()
 }
 
-document.addEventListener("DOMContentLoaded", function(){
+document.addEventListener("change", function(e){
 
-loadSubjects()
+    if(e.target.classList.contains("class-select")){
+        let row = e.target.closest("tr")
+        let subjectSelect = row.querySelector(".subject-select")
+
+        loadSubjects(e.target, subjectSelect)
+    }
 
 })
 
+
+// VALIDATION
 document.getElementById("addTeacherForm").addEventListener("submit", function(e){
 
-let username = document.getElementById("teacherUsername").value.trim()
+    let username = document.getElementById("teacherUsername").value.trim()
+    let names = username.split(" ")
 
-let names = username.split(" ")
+    if(names.length !== 3){
+        e.preventDefault()
+        alert("Username lazima iwe na majina matatu mfano: Juma Ali Said")
+    }
 
-if(names.length !== 3){
+})
 
-e.preventDefault()
 
-alert("Username lazima iwe na majina matatu mfano: Juma Ali Said")
+document.getElementById("combination").addEventListener("change", function(){
 
-}
+    let rows = document.querySelectorAll("#subjectTable tbody tr")
+
+    rows.forEach(row => {
+
+        let classSelect = row.querySelector(".class-select")
+        let subjectSelect = row.querySelector(".subject-select")
+
+        if(classSelect.value){
+            loadSubjects(classSelect, subjectSelect)
+        }
+
+    })
 
 })
 

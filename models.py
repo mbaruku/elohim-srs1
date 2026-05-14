@@ -75,17 +75,26 @@ class StudentResult(db.Model):
 
     subject = db.Column(db.String(100), nullable=False)
     class_level = db.Column(db.String(20), nullable=False)
+
+    # MUHIMU SANA
+    term = db.Column(db.String(20), nullable=False)  
+    academic_year = db.Column(db.Integer, nullable=False)
+
+    # TESTS
     test1 = db.Column(db.Float, default=0.0)
     test2 = db.Column(db.Float, default=0.0)
-    exam_type = db.Column(db.String(50))
+    pre_test = db.Column(db.Float, default=0.0)
+
+    # FINAL EXAM
+    exam_type = db.Column(db.String(50))  # Terminal / Annual
     exam_marks = db.Column(db.Float, default=0.0)
+
+    # RESULTS
     total = db.Column(db.Float, default=0.0)
     average = db.Column(db.Float, default=0.0)
     grade = db.Column(db.String(5))
-    approved = db.Column(db.Boolean, default=False)
 
-    exam_month = db.Column(db.String(20))
-    exam_year = db.Column(db.Integer)
+    approved = db.Column(db.Boolean, default=False)
 # ✅ Student Profile Model
 class StudentProfile(db.Model):
     __tablename__ = "student_profiles"

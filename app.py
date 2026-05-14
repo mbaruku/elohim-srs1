@@ -4,8 +4,13 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from datetime import datetime
 import pdfkit
+from collections import defaultdict
 import io
+from sqlalchemy import or_
 import os
+from sqlalchemy.orm import joinedload
+import csv
+from flask import Response
 from collections import defaultdict
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -29,8 +34,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
-# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -150,6 +155,19 @@ def logout():
 @admin_required
 def admin_dashboard():
 
+    from collections import defaultdict
+    from datetime import datetime
+
+    # 🔥 GET FILTERS
+    term = request.args.get('term')
+    exam_type = request.args.get('exam_type')
+    year = request.args.get('year')
+
+    print("=== FILTERS ===")
+    print("TERM:", term)
+    print("EXAM:", exam_type)
+    print("YEAR:", year)
+
     class_map = {
         "Form One": "Form1",
         "Form Two": "Form2",
@@ -157,116 +175,169 @@ def admin_dashboard():
         "Form Four": "Form4"
     }
 
-    forms = list(class_map.keys())
+    grade_points = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'F': 5}
+
     class_results = {}
 
-    for form in forms:
+    for form in class_map.keys():
+
+        print("\n=== PROCESSING CLASS:", form, "===")
 
         students = User.query.filter_by(
             role='student',
             class_level=form
         ).all()
 
-        # 🔥 subjects per class (cleaned + ordered)
-        subjects = TeacherSubject.query.filter_by(
-            class_level=form
-        ).distinct(TeacherSubject.subject).all()
+        print("TOTAL STUDENTS:", len(students))
 
-        subjects = [s.subject for s in subjects]
+        # 🔥 BASE QUERY (IMPORTANT FIX)
+        query = StudentResult.query.filter(
+            StudentResult.class_level == form
+        )
+
+        # TERM
+        if term:
+            query = query.filter(StudentResult.term == term)
+
+        # EXAM TYPE FIX (MIDTERM)
+        if exam_type:
+            if exam_type == "Midterm":
+                query = query.filter(
+                    or_(
+                        StudentResult.exam_type == None,
+                        StudentResult.exam_type == "Midterm"
+                    )
+                )
+            else:
+                query = query.filter(StudentResult.exam_type == exam_type)
+
+        # YEAR FIX
+        if year:
+            query = query.filter(StudentResult.academic_year == int(year))
+
+        # ⚠ TEMP: ondoa approved filter kwa debug
+        # query = query.filter(StudentResult.approved == False)
+
+        all_results = query.all()
+
+        print("RESULTS FOUND:", len(all_results))
+
+        for r in all_results[:5]:
+            print("->", r.student_id, r.subject, r.term, r.exam_type, r.academic_year)
+
+        student_map = defaultdict(dict)
+
+        for r in all_results:
+            student_map[r.student_id][r.subject] = r
 
         rows = []
+        subjects_map = {}
 
         for student in students:
 
+            student_subjects = Subject.query.filter_by(
+                class_level=student.class_level
+            ).all()
+
+            if student.combination:
+                student_subjects = [
+                    s for s in student_subjects
+                    if s.category.lower() in [
+                        student.combination.lower(),
+                        "both"
+                    ]
+                ]
+
+            subject_names = [s.name for s in student_subjects]
+            subjects_map[student.id] = subject_names
+
             marks = {}
-            total_points = 0
-            valid_grades_count = 0
+            total_marks = 0
+            count_subjects = 0
+            subject_points = []
 
-            for subject in subjects:
+            for subject in subject_names:
 
-                r = StudentResult.query.filter_by(
-                    student_id=student.id,
-                    subject=subject,
-                    class_level=form,
-                    approved=False
-                ).first()
+                r = student_map.get(student.id, {}).get(subject)
 
                 if r:
-                    marks[subject] = r
+                    avg = round(r.average or 0, 2)
 
-                    grade_points = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'F': 5}
+                    marks[subject] = {
+                        "marks": avg,
+                        "grade": r.grade
+                    }
+
+                    total_marks += avg
+                    count_subjects += 1
 
                     if r.grade in grade_points:
-                        total_points += grade_points[r.grade]
-                        valid_grades_count += 1
+                        subject_points.append(grade_points[r.grade])
                 else:
                     marks[subject] = None
 
-            complete = all(marks[s] is not None for s in subjects) and len(subjects) > 0
+            complete = all(
+                marks[s] is not None for s in subject_names
+            ) if subject_names else False
 
-            if complete and valid_grades_count > 0:
+            average_marks = round(
+                total_marks / count_subjects, 2
+            ) if count_subjects > 0 else 0
+
+            division = None
+            total_points = None
+
+            if len(subject_points) >= 7:
+                best7 = sorted(subject_points)[:7]
+                total_points = sum(best7)
 
                 if 7 <= total_points <= 17:
                     division = "I"
-                elif 18 <= total_points <= 22:
+                elif 18 <= total_points <= 21:
                     division = "II"
-                elif 23 <= total_points <= 25:
+                elif 22 <= total_points <= 25:
                     division = "III"
                 elif 26 <= total_points <= 33:
                     division = "IV"
-                elif 34 <= total_points <= 35:
-                    division = "V"
                 else:
                     division = "0"
-            else:
-                division = None
 
             rows.append({
                 "student": student,
                 "marks": marks,
                 "complete": complete,
+                "average": average_marks,
+                "aggregate": total_points,
                 "division": division
             })
 
+        rows = sorted(rows, key=lambda x: x["average"], reverse=True)
+
+        for i, r in enumerate(rows, start=1):
+            r["position"] = i
+
         class_results[class_map[form]] = {
-            "subjects": subjects,
-            "rows": rows
+            "rows": rows,
+            "subjects_map": subjects_map
         }
 
-    now = datetime.now()
-    current_month = now.strftime("%B")
-    current_year = now.year
-
-    users = User.query.all()
-
-    # 🔥 ALL SUBJECTS (FOR ACCORDION GROUPING)
-    all_subjects = Subject.query.order_by(
+    subjects = Subject.query.order_by(
         Subject.class_level,
         Subject.name
     ).all()
 
-    # GROUP BY CLASS (IMPORTANT FOR YOUR NEW UI)
-    from collections import defaultdict
-
-    grouped_subjects = defaultdict(list)
-
-    for s in all_subjects:
-        grouped_subjects[s.class_level].append(s)
+    now = datetime.now()
 
     return render_template(
         "admin/dashboard.html",
         class_results=class_results,
+        subjects=subjects,
         teachers=User.query.filter_by(role='teacher').count(),
         students=User.query.filter_by(role='student').count(),
-        current_month=current_month,
-        current_year=current_year,
-        users=users,
-
-        # 🔥 NEW CLEAN STRUCTURE
-        subjects=all_subjects,
-        subjects_grouped=grouped_subjects
+        current_month=now.strftime("%B"),
+        current_year=now.year,
+        users=User.query.all()
     )
-
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -377,30 +448,59 @@ def add_teacher():
 @app.route("/admin/add-student", methods=["POST"])
 @admin_required
 def add_student():
+
     username = request.form["username"].strip()
     password = request.form["password"].strip()
     class_level = request.form["class_level"]
-    combination = request.form.get("combination", "")
-    subjects = request.form.getlist("subjects[]")
+    combination = request.form.get("combination", "").strip().lower()
 
-    # Hakiki username
+    # CHECK USER
     if User.query.filter_by(username=username).first():
         flash("Mwanafunzi huyo tayari yupo", "danger")
         return redirect("/admin")
 
-    user = User(username=username, role="student", class_level=class_level, combination=combination)
+    # CREATE STUDENT
+    user = User(
+        username=username,
+        role="student",
+        class_level=class_level,
+        combination=combination
+    )
+
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
 
-    # Hifadhi masomo
+    # BASE QUERY
+    valid_query = Subject.query.filter_by(class_level=class_level)
+
+    # 🔥 APPLY FILTER ONLY IF COMBINATION EXISTS
+    if combination:
+
+        valid_query = valid_query.filter(
+            db.or_(
+                db.func.lower(Subject.category) == combination,
+                db.func.lower(Subject.category) == "both"
+            )
+        )
+
+    subjects = valid_query.all()
+
+    # ASSIGN SUBJECTS
     for sub in subjects:
-        ts = TeacherSubject(teacher_id=user.id, subject=sub, class_level=class_level)
+        ts = TeacherSubject(
+            teacher_id=user.id,
+            subject=sub.name,
+            class_level=class_level
+        )
         db.session.add(ts)
+
     db.session.commit()
 
-    flash("Mwanafunzi ameongezwa pamoja na masomo yake", "success")
+    flash("Mwanafunzi ameongezwa na masomo sahihi", "success")
     return redirect("/admin")
+
+    
 @app.route('/admin/delete-user', methods=['POST'])
 @admin_required
 def delete_user():
@@ -514,33 +614,79 @@ def edit_user(id):
 def teacher_dashboard():
     if "role" not in session or session["role"] != "teacher":
         return redirect("/login")
-    
-
 
     teacher_id = session.get("user_id")
-    teacher = User.query.get(teacher_id)
+    teacher = db.session.get(User, teacher_id)
 
- 
-
-    # Vuta masomo yote ya mwalimu huyu kutoka TeacherSubject
+    # =====================
+    # SUBJECTS
+    # =====================
     subjects = TeacherSubject.query.filter_by(teacher_id=teacher_id).all()
 
-  
-
-    # Patikana wanafunzi wa madarasa anayofundisha
     class_levels = list(set([s.class_level for s in subjects]))
-    students = User.query.filter(
-        User.role == "student", User.class_level.in_(class_levels)
+
+    # =====================
+    # STUDENTS
+    # =====================
+    all_students = User.query.filter(
+        User.role == "student",
+        User.class_level.in_(class_levels)
     ).all()
-    
-    print("Mwalimu:", teacher.username)
-    print("Class level:", class_levels)
-    print("Students found:", [s.username for s in students])
+
+    subject_students_map = {}
+
+    print("\n========== DEBUG START ==========")
+
+    for sub in subjects:
+
+        subject_obj = Subject.query.filter_by(
+            name=sub.subject,
+            class_level=sub.class_level
+        ).first()
+
+        subject_category = (
+            subject_obj.category.strip().lower()
+            if subject_obj and subject_obj.category
+            else ""
+        )
+
+        print(f"\nSUBJECT: {sub.subject} | CLASS: {sub.class_level}")
+        print("CATEGORY:", subject_category)
+
+        filtered_students = []
+
+        for student in all_students:
+
+            if student.class_level != sub.class_level:
+                continue
+
+            student_combination = (student.combination or "").strip().lower()
+
+            print(f"Checking -> {student.username} | {student_combination}")
+
+            if subject_category == "both":
+                filtered_students.append(student)
+
+            elif subject_category and student_combination:
+                if (
+                    subject_category in student_combination
+                    or student_combination in subject_category
+                ):
+                    filtered_students.append(student)
+
+        # 🔥 IMPORTANT FIX (STABLE KEY)
+        subject_students_map[sub.id] = filtered_students
+
+        print("FINAL:", [s.username for s in filtered_students])
+
+    print("========== DEBUG END ==========\n")
 
     return render_template(
-        "teacher/dashboard.html", teacher=teacher, subjects=subjects, students=students,
+        "teacher/dashboard.html",
+        teacher=teacher,
+        subjects=subjects,
+        subject_students_map=subject_students_map
     )
-
 
 @app.route("/test-subjects/<username>")
 def test_subjects(username):
@@ -572,100 +718,242 @@ def get_grade_and_remarks(total):
 
 @app.route('/teacher/upload-result', methods=['POST'])
 def upload_result():
+
     if 'role' not in session or session['role'] != 'teacher':
         return redirect('/login')
 
-    teacher_id = session['user_id']
-    
-    student_ids = request.form.getlist('student_ids[]')
+    subject = request.form.get('subject')
+    class_level = request.form.get('class_level')
+    term = request.form.get('term')
+    academic_year = request.form.get('academic_year')
 
-    for sid in student_ids:
-        test1 = float(request.form.get(f'test1_{sid}', 0))
-        test2 = float(request.form.get(f'test2_{sid}', 0))
-        exam_type = request.form.get(f'exam_type_{sid}', '')
-        exam_marks = float(request.form.get(f'exam_marks_{sid}', 0))
+    # 🔥 MPYA
+    exam_type = request.form.get('exam_type')
+    month = request.form.get('month')
 
-        total = test1 + test2 + exam_marks
-        average = total / 3
-        # simple grading
-        if average >= 75:
-            grade = "A"
-        elif average >= 65:
-            grade = "B"
-        elif average >= 45:
-            grade = "C"
-        elif average >= 30:
-            grade = "D"
-        else:
-            grade = "F"
+    # =========================
+    # GET SUBJECT OBJECT
+    # =========================
+    subject_obj = Subject.query.filter_by(
+        name=subject,
+        class_level=class_level
+    ).first()
 
-        # Assume we know class_level & subject for this teacher
-        # Here you need to pass it in the form or get from teacher assignment
-        subject = request.form.get('subject')  # You must add hidden input for this
-        class_level = request.form.get('class_level')  # add hidden input
+    if not subject_obj:
+        flash("Subject not found!", "danger")
+        return redirect('/teacher')
 
-        # Create or update result
+    subject_category = (subject_obj.category or "").strip().lower()
+
+    # =========================
+    # GET ALL STUDENTS IN CLASS
+    # =========================
+    students = User.query.filter_by(
+        role='student',
+        class_level=class_level
+    ).all()
+
+    # =========================
+    # FILTER BY COMBINATION (FIXED)
+    # =========================
+    filtered_students = []
+
+    for student in students:
+
+        student_combination = (student.combination or "").strip().lower()
+
+        if subject_category == "both":
+            filtered_students.append(student)
+
+        elif subject_category == student_combination:
+            filtered_students.append(student)
+
+    # =========================
+    # NO STUDENTS FOUND
+    # =========================
+    if not filtered_students:
+        flash("No students found for this subject combination!", "warning")
+        return redirect('/teacher')
+
+    # =========================
+    # PROCESS RESULTS
+    # =========================
+    for student in filtered_students:
+
+        sid = student.id
+
         result = StudentResult.query.filter_by(
             student_id=sid,
             subject=subject,
-            class_level=class_level
+            class_level=class_level,
+            term=term,
+            academic_year=academic_year,
+            exam_type=exam_type   # 🔥 muhimu
         ).first()
 
         if not result:
             result = StudentResult(
                 student_id=sid,
                 subject=subject,
-                class_level=class_level
+                class_level=class_level,
+                term=term,
+                academic_year=academic_year,
+                exam_type=exam_type,
             )
             db.session.add(result)
 
+        # =========================
+        # INPUT MARKS
+        # =========================
+        test1 = request.form.get(f'test1_{sid}')
+        test2 = request.form.get(f'test2_{sid}')
+        pre_test = request.form.get(f'pretest_{sid}')
+        exam_marks = request.form.get(f'exam_marks_{sid}')
+
+        test1 = float(test1) if test1 else (result.test1 or 0)
+        test2 = float(test2) if test2 else (result.test2 or 0)
+        pre_test = float(pre_test) if pre_test else (result.pre_test or 0)
+        exam_marks = float(exam_marks) if exam_marks else (result.exam_marks or 0)
+
+        # =========================
+        # SAVE RAW
+        # =========================
         result.test1 = test1
         result.test2 = test2
-        result.exam_type = exam_type
+        result.pre_test = pre_test
         result.exam_marks = exam_marks
+
+        # 🔥 SAVE EXTRA (MPYA)
+        result.exam_type = exam_type
+        result.month = month
+
+        # =========================
+        # CALCULATION (HAIJABADILISHWA)
+        # =========================
+        if pre_test == 0 and exam_marks == 0:
+            total = test1 + test2
+            average = total / 2 if (test1 or test2) else 0
+        else:
+            combined_test = (test2 + pre_test) / 2
+            total = test1 + combined_test + exam_marks
+            average = total / 3 if (test1 or test2 or exam_marks) else 0
+
         result.total = total
         result.average = average
-        result.grade = grade
-        result.approved = False  # default not approved
 
+        # =========================
+        # GRADE (HAIJABADILISHWA)
+        # =========================
+        if average >= 75:
+            result.grade = "A"
+        elif average >= 65:
+            result.grade = "B"
+        elif average >= 45:
+            result.grade = "C"
+        elif average >= 30:
+            result.grade = "D"
+        else:
+            result.grade = "F"
+
+    # =========================
+    # SAVE DB
+    # =========================
     db.session.commit()
-    flash("Matokeo yamehifadhiwa kikamilifu!", "success")
-    return redirect('/teacher')  # au redirect back to dashboard
+
+    flash(f"{exam_type} results saved successfully!", "success")
+    return redirect('/teacher')
+
+from flask import session, redirect, render_template
 from datetime import datetime
+from collections import defaultdict
 
 @app.route('/student')
 def student_dashboard():
+
     if 'role' not in session or session['role'] != 'student':
         return redirect('/login')
 
+    # =========================
+    # GET STUDENT
+    # =========================
     student_id = session['user_id']
     student = User.query.get(student_id)
 
-    # Matokeo
-    results = StudentResult.query.filter_by(student_id=student_id).all()
-    approved = any(r.approved for r in results)
+    # =========================
+    # GET SUBJECTS BY COMBINATION
+    # =========================
+    subjects_query = Subject.query.filter_by(
+        class_level=student.class_level
+    ).all()
+
+    if student.combination:
+        subjects_allowed = [
+            s.name for s in subjects_query
+            if s.category and s.category.lower() in [
+                student.combination.lower(),
+                "both"
+            ]
+        ]
+    else:
+        subjects_allowed = [s.name for s in subjects_query]
+
+    # =========================
+    # GET RESULTS (FILTERED BY COMBINATION)
+    # =========================
+    results = StudentResult.query.filter(
+        StudentResult.student_id == student_id,
+        StudentResult.subject.in_(subjects_allowed)
+    ).all()
+
+    approved_results = [r for r in results if r.approved]
+
+    approved = len(approved_results) > 0
     exam_type = next((r.exam_type for r in results if r.exam_type), None)
 
-    # Rank
+    # =========================
+    # TOTAL & AVERAGE
+    # =========================
+    student_total_marks = sum([r.total or 0 for r in approved_results])
+
+    if approved_results:
+        average_marks = sum([r.average or 0 for r in approved_results]) / len(approved_results)
+    else:
+        average_marks = 0
+
+    # =========================
+    # RANK (WITH COMBINATION FILTER)
+    # =========================
     total_students = User.query.filter_by(
         class_level=student.class_level,
         role='student'
     ).count()
 
-    class_results = StudentResult.query.filter_by(
-        class_level=student.class_level,
-        approved=True
+    class_results = StudentResult.query.filter(
+        StudentResult.class_level == student.class_level,
+        StudentResult.subject.in_(subjects_allowed),
+        StudentResult.approved == True
     ).all()
 
     scores_by_student = {}
+
     for r in class_results:
         scores_by_student.setdefault(r.student_id, 0)
         scores_by_student[r.student_id] += r.total or 0
 
-    sorted_students = sorted(scores_by_student.items(), key=lambda x: x[1], reverse=True)
-    rank = next((i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id), None)
+    sorted_students = sorted(
+        scores_by_student.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
 
-    # Remarks & division
+    rank = next(
+        (i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id),
+        None
+    )
+
+    # =========================
+    # REMARKS
+    # =========================
     grade_remarks = {
         "A": "Excellent",
         "B": "Very Good",
@@ -678,24 +966,41 @@ def student_dashboard():
         r.remarks = grade_remarks.get(r.grade, "-")
         r.can_view = r.approved
 
-    # Points & Division
+    # =========================
+    # BEST 7 DIVISION SYSTEM
+    # =========================
     points_map = {"A": 1, "B": 2, "C": 3, "D": 4, "F": 5}
-    total_points = sum([points_map.get(r.grade, 0) for r in results if r.approved])
 
-    if 7 <= total_points <= 17:
-        division = "I"
-    elif 18 <= total_points <= 22:
-        division = "II"
-    elif 23 <= total_points <= 25:
-        division = "III"
-    elif 26 <= total_points <= 33:
-        division = "IV"
-    elif total_points >= 34:
-        division = "V"
+    subject_points = []
+
+    for r in approved_results:
+        if r.grade in points_map:
+            subject_points.append(points_map[r.grade])
+
+    division = None
+    total_points = None
+
+    if len(subject_points) >= 7:
+
+        best7 = sorted(subject_points)[:7]
+        total_points = sum(best7)
+
+        if 7 <= total_points <= 17:
+            division = "I"
+        elif 18 <= total_points <= 21:
+            division = "II"
+        elif 22 <= total_points <= 25:
+            division = "III"
+        elif 26 <= total_points <= 33:
+            division = "IV"
+        else:
+            division = "0"
     else:
-        division = None
+        division = "Incomplete"
 
+    # =========================
     # PROFILE
+    # =========================
     profile = student.profile
 
     profile_data = {
@@ -709,37 +1014,54 @@ def student_dashboard():
         "teacher_remarks": profile.teacher_remarks if profile else ""
     }
 
-    # Resources & Events
+    # =========================
+    # RESOURCES & EVENTS
+    # =========================
     resources = Resource.query.all()
     events = Event.query.order_by(Event.created_at.desc()).all()
 
-    # Month & Year
+    # =========================
+    # DATE INFO
+    # =========================
     now = datetime.now()
     exam_month = now.strftime("%B")
     exam_year = now.year
 
-    # ⭐ NEW: TOTAL MARKS & AVERAGE
-    student_total_marks = sum([r.total or 0 for r in results if r.approved])
-    average_marks = student_total_marks / 3 if student_total_marks else 0
-
+    # =========================
+    # FINAL OUTPUT
+    # =========================
     return render_template(
         'student/dashboard.html',
+
         student=student,
         results=results,
         approved=approved,
+
+        exam_type=exam_type,
+
         rank=rank,
         total_students=total_students,
+
         division=division,
-        total_points=total_points,   # optional (useful for UI)
+        total_points=total_points,
+
+        student_total_marks=student_total_marks,
+        average_marks=average_marks,
+
         profile=profile_data,
-        exam_type=exam_type,
+
         exam_month=exam_month,
         exam_year=exam_year,
+
         resources=resources,
         events=events,
-        student_total_marks=student_total_marks,
-        average_marks=average_marks
+
+        # 🔥 IMPORTANT: show combination
+        combination=student.combination,
+        subjects_allowed=subjects_allowed
     )
+
+
 @app.route("/fix-students-set-class")
 def fix_students_set_class():
     students = User.query.filter_by(role="student").all()
@@ -915,57 +1237,117 @@ def is_class_teacher():
 @app.route("/teacher/class-teacher-dashboard")
 def class_teacher_dashboard():
 
-    # Hakikisha user ana-login
+    # =========================
+    # AUTH CHECK
+    # =========================
     if "role" not in session or session["role"] != "teacher":
         return redirect("/login")
 
-    # Hakikisha mwalimu ni class teacher
-    if not session.get("is_class_teacher", False):
+    if not session.get("is_class_teacher"):
         return "You are not a class teacher.", 403
 
     teacher_id = session.get("user_id")
-    teacher = User.query.get(teacher_id)
+    teacher = db.session.get(User, teacher_id)
 
-    # Masomo anayofundisha
-    subjects = TeacherSubject.query.filter_by(teacher_id=teacher_id).all()
+    # =========================
+    # SUBJECTS
+    # =========================
+    subjects = TeacherSubject.query.filter_by(
+        teacher_id=teacher_id
+    ).all()
 
-    # Madarasa anayofundisha
     class_levels = list(set([s.class_level for s in subjects]))
 
-    # Wanafunzi wa madarasa hayo
+    # =========================
+    # STUDENTS
+    # =========================
     students = User.query.filter(
         User.role == "student",
         User.class_level.in_(class_levels)
     ).all()
 
-    # ⭐ PATA FEEDBACK ZA WANAFUNZI
     student_ids = [s.id for s in students]
 
+    # =========================
+    # FEEDBACK
+    # =========================
     feedbacks = Feedback.query.filter(
         Feedback.student_id.in_(student_ids)
     ).order_by(Feedback.created_at.desc()).all()
 
-    # ⭐ HESABU FEEDBACK MPYA (NOTIFICATION)
     unread_feedback = Feedback.query.filter(
         Feedback.student_id.in_(student_ids),
         Feedback.is_read == False
     ).count()
 
-    # ⭐ MARK FEEDBACK ZOTE ZIWE READ
+    # =========================
+    # MARK FEEDBACK AS READ
+    # =========================
     for fb in feedbacks:
-        fb.is_read = True
+        if not fb.is_read:
+            fb.is_read = True
 
     db.session.commit()
 
+    # =========================
+    # OPTIONAL: SUBJECT STUDENT MAP (FIX FOR FRONTEND)
+    # =========================
+    subject_students_map = {}
+
+    for sub in subjects:
+
+        subject_obj = Subject.query.filter_by(
+            name=sub.subject,
+            class_level=sub.class_level
+        ).first()
+
+        subject_category = (
+            subject_obj.category.strip().lower()
+            if subject_obj and subject_obj.category
+            else ""
+        )
+
+        filtered_students = []
+
+        for student in students:
+
+            if student.class_level != sub.class_level:
+                continue
+
+            student_combination = (student.combination or "").strip().lower()
+
+            if subject_category == "both":
+                filtered_students.append(student)
+
+            elif subject_category and student_combination:
+                if (
+                    subject_category in student_combination
+                    or student_combination in subject_category
+                ):
+                    filtered_students.append(student)
+
+        subject_students_map[sub.id] = filtered_students
+
+    # =========================
+    # FINAL RENDER (SAFE)
+    # =========================
     return render_template(
         "teacher/class-teacher-dashboard.html",
+
         teacher=teacher,
         subjects=subjects,
         students=students,
+
         feedbacks=feedbacks,
         unread_feedback=unread_feedback,
-        class_teacher=True
+
+        class_teacher=True,
+
+        # 🔥 IMPORTANT FIX
+        subject_students_map=subject_students_map
     )
+
+
 @app.route('/admin/approve-student/<int:student_id>', methods=['POST'])
 def approve_student(student_id):
     # pata matokeo yote ya student hayajapewa approve
@@ -1149,25 +1531,40 @@ def admin_reset_password(user_id):
     return redirect("/admin")
 
 
-@app.route("/admin/add-subject", methods=["POST"])
-def add_subject():
+@app.route('/admin/add-subject-bulk', methods=['POST'])
+def add_subject_bulk():
 
-    name = request.form.get("subject_name")
-    category = request.form.get("category")
-    class_level = request.form.get("class_level")
+    subjects_text = request.form.get('subjects')
+    classes = request.form.getlist('classes')
+    category = request.form.get('category')
 
-    subject = Subject(
-        name=name,
-        category=category,
-        class_level=class_level
-    )
+    subjects_list = [s.strip() for s in subjects_text.split('\n') if s.strip()]
 
-    db.session.add(subject)
+    for subject_name in subjects_list:
+
+        for class_level in classes:
+
+            # avoid duplicates
+            exists = Subject.query.filter_by(
+                name=subject_name,
+                class_level=class_level
+            ).first()
+
+            if not exists:
+
+                new_subject = Subject(
+                    name=subject_name,
+                    class_level=class_level,
+                    category=category
+                )
+
+                db.session.add(new_subject)
+
     db.session.commit()
 
-    flash("Subject added successfully", "success")
+    flash("Subjects added successfully!", "success")
 
-    return redirect(url_for("admin_dashboard"))
+    return redirect(request.referrer)
 
 @app.route("/admin/delete-subject/<int:id>", methods=["POST"])
 def delete_subject(id):
@@ -1185,22 +1582,26 @@ def delete_subject(id):
 @app.route("/admin/get-subjects")
 def get_subjects():
 
-    class_level = request.args.get("class_level")
-    combination = request.args.get("combination")
+    class_level = (request.args.get("class_level") or "").strip()
+    combination = (request.args.get("combination") or "").strip().lower()
 
-    if class_level in ["Form Three", "Form Four"]:
-        subjects = Subject.query.filter(
-            Subject.class_level == class_level,
-            Subject.category.in_([combination.lower(), "both"])
-        ).all()
-    else:
-        subjects = Subject.query.filter_by(class_level=class_level).all()
+    query = Subject.query.filter_by(class_level=class_level)
+
+    # 🔥 APPLY FILTER KWA MADARASA YOTE KAMA COMBINATION IPO
+    if combination:
+
+        query = query.filter(
+            db.or_(
+                db.func.lower(Subject.category) == combination,
+                db.func.lower(Subject.category) == "both"
+            )
+        )
+
+    subjects = query.order_by(Subject.name).all()
 
     return {
         "subjects": [s.name for s in subjects]
     }
-
-
 @app.route("/admin/get-all-subjects")
 def get_all_subjects():
 
@@ -1227,6 +1628,266 @@ def update_subject():
 
     return redirect("/admin")
 
+
+@app.route('/teacher/view-results')
+def view_results():
+
+    if 'role' not in session or session['role'] != 'teacher':
+        return redirect('/login')
+
+    subject = request.args.get('subject')
+    class_level = request.args.get('class_level')
+    term = request.args.get('term')
+    academic_year = request.args.get('year')
+
+    results = StudentResult.query.filter_by(
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        academic_year=academic_year
+    ).order_by(StudentResult.average.desc()).all()
+
+    return render_template(
+        "teacher/view_results.html",
+        results=results,
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        academic_year=academic_year
+    )
+
+@app.route('/teacher/download-results')
+def download_results():
+
+    if 'role' not in session or session['role'] != 'teacher':
+        return redirect('/login')
+
+    subject = request.args.get('subject')
+    class_level = request.args.get('class_level')
+    term = request.args.get('term')
+    academic_year = request.args.get('academic_year')
+
+    results = StudentResult.query.options(
+        joinedload(StudentResult.student)
+    ).filter_by(
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        academic_year=academic_year
+    ).order_by(StudentResult.average.desc()).all()
+
+    def generate():
+
+        yield "Position,Student,Test1,Test2,PreTest,Exam,Total,Average,Grade\n"
+
+        position = 1
+
+        for r in results:
+
+            yield f"{position},{r.student.username},{r.test1},{r.test2},{r.pre_test},{r.exam_marks},{r.total},{round(r.average,2)},{r.grade}\n"
+
+            position += 1
+
+    return Response(
+        generate(),
+        mimetype='text/csv',
+        headers={"Content-Disposition":"attachment; filename=results.csv"}
+    )
+
+
+@app.route('/teacher/send-to-admin', methods=['POST'])
+def send_to_admin():
+
+    data = request.get_json()
+
+    subject = data['subject']
+    class_level = data['class_level']
+    term = data['term']
+    year = data['year']
+
+    # save approval request
+    approval = ResultsApproval(
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        year=year,
+        status="pending"
+    )
+
+    db.session.add(approval)
+    db.session.commit()
+
+    return jsonify({"message": "Results zimepelekwa kwa admin kwa approval"})
+
+
+@app.route('/teacher/edit-results')
+def edit_results():
+
+    subject = request.args.get('subject')
+    class_level = request.args.get('class_level')
+    term = request.args.get('term')
+    year = request.args.get('year')
+
+    results = StudentResult.query.filter_by(
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        academic_year=year
+    ).all()
+
+    return render_template(
+        "edit_results.html",
+        results=results,
+        subject=subject,
+        class_level=class_level,
+        term=term,
+        academic_year=year
+    )
+
+
+@app.route('/teacher/update-results', methods=['POST'])
+def update_results():
+
+    subject = request.form.get('subject')
+    class_level = request.form.get('class_level')
+    term = request.form.get('term')
+    academic_year = request.form.get('academic_year')
+
+    result_ids = set()
+
+    # pata result ids kutoka form
+    for key in request.form.keys():
+        if "_" in key:
+            result_ids.add(key.split("_")[-1])
+
+    for rid in result_ids:
+
+        result = StudentResult.query.get(rid)
+
+        if not result:
+            continue
+
+        # ===== INPUTS =====
+        test1_input = request.form.get(f'test1_{rid}')
+        test2_input = request.form.get(f'test2_{rid}')
+        pretest_input = request.form.get(f'pretest_{rid}')
+        exam_input = request.form.get(f'exam_{rid}')
+
+        # ===== KEEP OLD VALUES =====
+        test1 = float(test1_input) if test1_input else (result.test1 or 0)
+        test2 = float(test2_input) if test2_input else (result.test2 or 0)
+        pre_test = float(pretest_input) if pretest_input else (result.pre_test or 0)
+        exam_marks = float(exam_input) if exam_input else (result.exam_marks or 0)
+
+        # ===== SAVE MARKS =====
+        result.test1 = test1
+        result.test2 = test2
+        result.pre_test = pre_test
+        result.exam_marks = exam_marks
+
+        # ===== CALCULATION =====
+        combined_test = (test2 + pre_test) / 2
+        total = test1 + combined_test + exam_marks
+        average = total / 3
+
+        # ===== GRADE =====
+        if average >= 75:
+            grade = "A"
+        elif average >= 65:
+            grade = "B"
+        elif average >= 45:
+            grade = "C"
+        elif average >= 30:
+            grade = "D"
+        else:
+            grade = "F"
+
+        result.total = total
+        result.average = average
+        result.grade = grade
+
+    db.session.commit()
+
+    flash("Results updated successfully!", "success")
+
+    return redirect(request.referrer)
+
+
+@app.route('/admin/edit-subject', methods=['POST'])
+def edit_subject():
+
+    subject_id = request.form.get("subject_id")
+    subject_name = request.form.get("subject_name")
+    class_level = request.form.get("class_level")
+    category = request.form.get("category")
+
+    subject = Subject.query.get(subject_id)
+
+    if subject:
+
+        subject.name = subject_name
+        subject.class_level = class_level
+        subject.category = category
+
+        db.session.commit()
+
+        flash("Subject updated successfully", "success")
+
+    else:
+
+        flash("Subject not found", "danger")
+
+    return redirect(url_for("admin_dashboard"))  
+
+
+
+@app.route("/admin/filter-results")
+def filter_results():
+
+    try:
+        form = request.args.get("form")
+        term = request.args.get("term")
+        exam_type = request.args.get("exam_type")
+        year = request.args.get("year")
+
+        print("FILTERS:", form, term, exam_type, year)
+
+        query = StudentResult.query.filter_by(class_level=form)
+
+        if term:
+            query = query.filter(StudentResult.term == term)
+
+        if exam_type:
+            query = query.filter(StudentResult.exam_type == exam_type)
+
+        if year:
+            query = query.filter(StudentResult.academic_year == int(year))
+
+        results = query.all()
+
+        print("FOUND:", len(results))
+
+        if not results:
+            return "<tr><td colspan='10'>Hakuna matokeo</td></tr>"
+
+        html = ""
+        for r in results:
+            html += f"""
+            <tr>
+                <td>{r.student.full_name or r.student.username}</td>
+                <td>{r.subject}</td>
+                <td>{r.total or '-'}</td>
+                <td>{r.average or '-'}</td>
+                <td>{r.grade or '-'}</td>
+            </tr>
+            """
+
+        return html
+
+    except Exception as e:
+        print("ERROR:", e)
+        return "Server error", 500
+    
 
 if __name__ == "__main__": 
     app.run(debug=True)

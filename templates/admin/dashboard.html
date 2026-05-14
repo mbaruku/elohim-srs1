@@ -122,7 +122,7 @@ data-bs-target="#addStudentModal">
 
 <button class="btn btn-dark"
 data-bs-toggle="modal"
-data-bs-target="#subjectModal">
+data-bs-target="#bulkSubjectModal">
 
 <i class="fa-solid fa-book"></i> Manage Subjects
 
@@ -199,78 +199,188 @@ Wanafunzi: {{ students }}
 
           {% if data.rows %}
           <!-- EXAM SETTINGS -->
-          <div class="row mb-3 align-items-end">
-            <div class="col-md-3">
-              <label class="form-label"><b>Type of Exam</b></label>
-              <select class="form-select exam-type" data-form="{{ form }}">
-                <option value="">Chagua Exam</option>
-                <option value="Midterm">Midterm</option>
-                <option value="Terminal">Terminal</option>
-                <option value="Annual">Annual</option>
-              </select>
-            </div>
+         <div class="row mb-3 align-items-end">
 
-            <div class="col-md-3">
-              <label class="form-label"><b>Mwezi</b></label>
-              <input type="text" class="form-control" value="{{ current_month }}" readonly>
-            </div>
+    <!-- TERM -->
+    <div class="col-md-3">
+        <label class="form-label"><b>Term</b></label>
+        <select class="form-select term-select" data-form="{{ form }}">
+    <option value="">Chagua Term</option>
+    <option value="Term 1" {% if request.args.get('term')=='Term 1' %}selected{% endif %}>Term 1</option>
+    <option value="Term 2" {% if request.args.get('term')=='Term 2' %}selected{% endif %}>Term 2</option>
+    <option value="Term 3" {% if request.args.get('term')=='Term 3' %}selected{% endif %}>Term 3</option>
+</select>
+    </div>
 
-            <div class="col-md-3">
-              <label class="form-label"><b>Mwaka</b></label>
-              <input type="text" class="form-control" value="{{ current_year }}" readonly>
-            </div>
+    <!-- EXAM TYPE -->
+    <div class="col-md-3">
+        <label class="form-label"><b>Type of Exam</b></label>
+        <select class="form-select exam-type" data-form="{{ form }}">
+            <option value="">Chagua Exam</option>
+            <option value="Midterm">Midterm</option>
+            <option value="Terminal">Terminal</option>
+            <option value="Annual">Annual</option>
+        </select>
+    </div>
 
-            <div class="col-md-3 text-end">
-              <label class="form-label d-block">&nbsp;</label>
-              <a href="/admin/download-class-pdf/{{ form }}" class="btn btn-danger download-pdf" data-form="{{ form }}">
-                <i class="fa-solid fa-file-pdf"></i> Download PDF
-              </a>
-            </div>
-          </div>
+    <!-- MONTH -->
+    <div class="col-md-2">
+        <label class="form-label"><b>Mwezi</b></label>
+        <input type="text"
+               class="form-control month-input"
+               value="{{ current_month }}"
+               readonly>
+    </div>
 
+    <!-- YEAR -->
+    <div class="col-md-2">
+        <label class="form-label"><b>Mwaka</b></label>
+        <input type="number"
+               class="form-control year-input"
+               value="{{ current_year }}">
+    </div>
+
+    <!-- DOWNLOAD -->
+    <div class="col-md-2 text-end">
+        <label class="form-label d-block">&nbsp;</label>
+
+        <button class="btn btn-danger download-pdf"
+                data-form="{{ form }}">
+            <i class="fa-solid fa-file-pdf"></i>
+            Download PDF
+        </button>
+    </div>
+
+</div>
           <!-- RESULTS TABLE -->
-          <div class="table-responsive">
-            <table class="table table-bordered table-striped table-hover">
-              <thead class="table-dark">
-                <tr>
-                  <th>Student</th>
-                  {% for subject in data.subjects %}<th>{{ subject }}</th>{% endfor %}
-                  <th>Division</th>
-                  <th>Exam Type</th>
-                  <th>Month</th>
-                  <th>Year</th>
-                  <th>Approve</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in data.rows %}
-                <tr>
-                  <td>{{ row.student.username }}</td>
-                  {% for subject in data.subjects %}
-                    <td>
-                      {% if row.marks.get(subject) %} {{ row.marks[subject].grade }} {% else %}<span class="text-muted">Pending</span>{% endif %}
-                    </td>
-                  {% endfor %}
-                  <td>{% if row.division %}{{ row.division }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
-                  <td class="exam-type-display text-muted">{{ row.exam_type or '-' }}</td>
-                  <td>{{ current_month }}</td>
-                  <td>{{ current_year }}</td>
-                  <td>
-                    {% if row.complete %}
-                    <button type="button" class="btn btn-success btn-sm approve-btn" data-student-id="{{ row.student.id }}" data-form="{{ form }}">
-                      <span class="btn-text"><i class="fa-solid fa-check"></i> Approve</span>
-                      <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-                    </button>
-                    {% else %}
-                    <button class="btn btn-secondary btn-sm" disabled><i class="fa-solid fa-clock"></i> Pending Subjects</button>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
+<div class="table-responsive">
+<table class="table table-bordered table-sm table-hover">
 
+<thead class="table-dark">
+
+<tr>
+
+<th rowspan="2">Student</th>
+
+{% set first_student = data.rows[0] if data.rows else None %}
+{% set first_subjects = data.subjects_map[first_student.student.id] if first_student else [] %}
+
+{% for subject in first_subjects %}
+<th colspan="2">{{ subject }}</th>
+{% endfor %}
+
+<th rowspan="2">AVG</th>
+<th rowspan="2">AGGT</th>
+<th rowspan="2">DIV</th>
+<th rowspan="2">POS</th>
+<th rowspan="2">Approve</th>
+
+</tr>
+
+<tr>
+
+{% for subject in first_subjects %}
+<th>M</th>
+<th>G</th>
+{% endfor %}
+
+</tr>
+
+</thead>
+
+<tbody id="results-body-{{ form|replace(' ','') }}">
+
+{% for row in data.rows %}
+
+{% set student_subjects = data.subjects_map[row.student.id] %}
+
+<tr class="{% if row.position <= 3 %}table-success{% endif %}">
+
+<td>
+{{ row.student.full_name or row.student.username }}
+</td>
+
+{% for subject in first_subjects %}
+
+{% if subject in student_subjects %}
+
+<td>
+{% if row.marks.get(subject) %}
+{{ row.marks[subject].marks }}
+{% else %}
+-
+{% endif %}
+</td>
+
+<td>
+{% if row.marks.get(subject) %}
+{{ row.marks[subject].grade }}
+{% else %}
+-
+{% endif %}
+</td>
+
+{% else %}
+
+<td class="disabled-subject">-</td>
+<td class="disabled-subject">-</td>
+
+{% endif %}
+
+{% endfor %}
+
+<td>{{ row.average or '-' }}</td>
+<td>{{ row.aggregate or '-' }}</td>
+<td>{{ row.division or '-' }}</td>
+
+<td>
+{% if row.position == 1 %}
+🥇 1
+{% elif row.position == 2 %}
+🥈 2
+{% elif row.position == 3 %}
+🥉 3
+{% else %}
+{{ row.position or '-' }}
+{% endif %}
+</td>
+
+<td>
+
+{% if row.complete %}
+
+<button type="button"
+class="btn btn-success btn-sm approve-btn"
+data-student-id="{{ row.student.id }}"
+data-form="{{ form }}">
+
+<span class="btn-text">
+<i class="fa-solid fa-check"></i> Approve
+</span>
+
+<span class="spinner-border spinner-border-sm d-none"></span>
+
+</button>
+
+{% else %}
+
+<button class="btn btn-secondary btn-sm" disabled>
+<i class="fa-solid fa-clock"></i> Pending
+</button>
+
+{% endif %}
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
           {% else %}
           <p class="text-muted"><i class="fa-solid fa-circle-info"></i> Hakuna wanafunzi au matokeo.</p>
           {% endif %}
@@ -718,6 +828,45 @@ function setEditSubject(id, name, class_level, category) {
     "/admin/edit-subject/" + id;
 }
 
+$('.term-select, .exam-type, .year-input').on('change', function () {
+
+    var form = $(this).data('form');
+
+    var term = $('.term-select[data-form="'+form+'"]').val();
+    var examType = $('.exam-type[data-form="'+form+'"]').val();
+    var year = $('.year-input').val();
+
+    if (!term || !examType || !year) return;
+
+    $.ajax({
+        url: "/admin",
+        method: "GET",
+        data: {
+            term: term,
+            exam_type: examType,
+            year: year
+        },
+        success: function (response) {
+
+            // replace ONLY results section
+            let html = $(response).find("#resultsAccordion").html();
+
+            $("#resultsAccordion").html(html);
+        }
+    });
+});
+
+
+$(document).on('shown.bs.collapse', function (e) {
+    localStorage.setItem('openAccordion', e.target.id);
+});
+
+$(document).ready(function(){
+    let open = localStorage.getItem('openAccordion');
+    if(open){
+        $('#' + open).addClass('show');
+    }
+});
 </script>
 
 </body>

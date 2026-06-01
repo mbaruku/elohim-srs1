@@ -151,6 +151,10 @@ def logout():
 
 
 # Flask route
+from sqlalchemy import or_
+from collections import defaultdict
+from datetime import datetime
+
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
@@ -158,15 +162,17 @@ def admin_dashboard():
     from collections import defaultdict
     from datetime import datetime
 
-    # 🔥 GET FILTERS
     term = request.args.get('term')
     exam_type = request.args.get('exam_type')
     year = request.args.get('year')
 
-    print("=== FILTERS ===")
+    academic_year = int(year) if year else None
+
+    print("\n=== FILTER DEBUG ===")
     print("TERM:", term)
     print("EXAM:", exam_type)
-    print("YEAR:", year)
+    print("YEAR:", academic_year)
+    print("====================\n")
 
     class_map = {
         "Form One": "Form1",
@@ -181,50 +187,35 @@ def admin_dashboard():
 
     for form in class_map.keys():
 
-        print("\n=== PROCESSING CLASS:", form, "===")
-
         students = User.query.filter_by(
             role='student',
             class_level=form
         ).all()
 
-        print("TOTAL STUDENTS:", len(students))
-
-        # 🔥 BASE QUERY (IMPORTANT FIX)
+        # =========================
+        # BASE QUERY SAFE FILTERING
+        # =========================
         query = StudentResult.query.filter(
             StudentResult.class_level == form
         )
 
-        # TERM
         if term:
             query = query.filter(StudentResult.term == term)
 
-        # EXAM TYPE FIX (MIDTERM)
+        if academic_year:
+            query = query.filter(StudentResult.academic_year == academic_year)
+
+        # 🔥 IMPORTANT FIX: exam_type logic CLEAN
         if exam_type:
-            if exam_type == "Midterm":
-                query = query.filter(
-                    or_(
-                        StudentResult.exam_type == None,
-                        StudentResult.exam_type == "Midterm"
-                    )
-                )
-            else:
-                query = query.filter(StudentResult.exam_type == exam_type)
-
-        # YEAR FIX
-        if year:
-            query = query.filter(StudentResult.academic_year == int(year))
-
-        # ⚠ TEMP: ondoa approved filter kwa debug
-        # query = query.filter(StudentResult.approved == False)
+            query = query.filter(StudentResult.exam_type == exam_type)
 
         all_results = query.all()
 
-        print("RESULTS FOUND:", len(all_results))
+        print(f"[{form}] RESULTS FOUND:", len(all_results))
 
-        for r in all_results[:5]:
-            print("->", r.student_id, r.subject, r.term, r.exam_type, r.academic_year)
-
+        # =========================
+        # GROUPING
+        # =========================
         student_map = defaultdict(dict)
 
         for r in all_results:
@@ -242,7 +233,7 @@ def admin_dashboard():
             if student.combination:
                 student_subjects = [
                     s for s in student_subjects
-                    if s.category.lower() in [
+                    if (s.category or "").lower() in [
                         student.combination.lower(),
                         "both"
                     ]
@@ -282,8 +273,11 @@ def admin_dashboard():
 
             average_marks = round(
                 total_marks / count_subjects, 2
-            ) if count_subjects > 0 else 0
+            ) if count_subjects else 0
 
+            # =========================
+            # DIVISION LOGIC (UNCHANGED BUT SAFE)
+            # =========================
             division = None
             total_points = None
 
@@ -311,6 +305,9 @@ def admin_dashboard():
                 "division": division
             })
 
+        # =========================
+        # RANKING (SAFE)
+        # =========================
         rows = sorted(rows, key=lambda x: x["average"], reverse=True)
 
         for i, r in enumerate(rows, start=1):
@@ -321,24 +318,20 @@ def admin_dashboard():
             "subjects_map": subjects_map
         }
 
-    subjects = Subject.query.order_by(
-        Subject.class_level,
-        Subject.name
-    ).all()
-
     now = datetime.now()
 
     return render_template(
         "admin/dashboard.html",
         class_results=class_results,
-        subjects=subjects,
+        subjects=Subject.query.order_by(
+            Subject.class_level, Subject.name
+        ).all(),
         teachers=User.query.filter_by(role='teacher').count(),
         students=User.query.filter_by(role='student').count(),
         current_month=now.strftime("%B"),
         current_year=now.year,
         users=User.query.all()
     )
-
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
@@ -722,17 +715,38 @@ def upload_result():
     if 'role' not in session or session['role'] != 'teacher':
         return redirect('/login')
 
+    # =========================
+    # FORM DATA
+    # =========================
     subject = request.form.get('subject')
     class_level = request.form.get('class_level')
     term = request.form.get('term')
-    academic_year = request.form.get('academic_year')
-
-    # 🔥 MPYA
     exam_type = request.form.get('exam_type')
     month = request.form.get('month')
 
+    # IMPORTANT
+    academic_year = request.form.get('academic_year')
+
     # =========================
-    # GET SUBJECT OBJECT
+    # DEBUG FORM DATA
+    # =========================
+    print("\n========== FORM DEBUG ==========")
+    print("subject =", repr(subject))
+    print("class_level =", repr(class_level))
+    print("term =", repr(term))
+    print("academic_year =", repr(academic_year))
+    print("exam_type =", repr(exam_type))
+    print("month =", repr(month))
+    print("================================\n")
+
+    if not academic_year:
+        flash("Academic year missing!", "danger")
+        return redirect('/teacher')
+
+    academic_year = int(academic_year)
+
+    # =========================
+    # GET SUBJECT
     # =========================
     subject_obj = Subject.query.filter_by(
         name=subject,
@@ -746,21 +760,20 @@ def upload_result():
     subject_category = (subject_obj.category or "").strip().lower()
 
     # =========================
-    # GET ALL STUDENTS IN CLASS
+    # GET STUDENTS
     # =========================
     students = User.query.filter_by(
         role='student',
         class_level=class_level
     ).all()
 
-    # =========================
-    # FILTER BY COMBINATION (FIXED)
-    # =========================
     filtered_students = []
 
     for student in students:
 
-        student_combination = (student.combination or "").strip().lower()
+        student_combination = (
+            student.combination or ""
+        ).strip().lower()
 
         if subject_category == "both":
             filtered_students.append(student)
@@ -768,15 +781,15 @@ def upload_result():
         elif subject_category == student_combination:
             filtered_students.append(student)
 
-    # =========================
-    # NO STUDENTS FOUND
-    # =========================
     if not filtered_students:
-        flash("No students found for this subject combination!", "warning")
+        flash(
+            "No students found for this subject combination!",
+            "warning"
+        )
         return redirect('/teacher')
 
     # =========================
-    # PROCESS RESULTS
+    # SAVE RESULTS
     # =========================
     for student in filtered_students:
 
@@ -788,7 +801,7 @@ def upload_result():
             class_level=class_level,
             term=term,
             academic_year=academic_year,
-            exam_type=exam_type   # 🔥 muhimu
+            exam_type=exam_type
         ).first()
 
         if not result:
@@ -798,8 +811,9 @@ def upload_result():
                 class_level=class_level,
                 term=term,
                 academic_year=academic_year,
-                exam_type=exam_type,
+                exam_type=exam_type
             )
+
             db.session.add(result)
 
         # =========================
@@ -816,33 +830,40 @@ def upload_result():
         exam_marks = float(exam_marks) if exam_marks else (result.exam_marks or 0)
 
         # =========================
-        # SAVE RAW
+        # SAVE MARKS
         # =========================
         result.test1 = test1
         result.test2 = test2
         result.pre_test = pre_test
         result.exam_marks = exam_marks
 
-        # 🔥 SAVE EXTRA (MPYA)
         result.exam_type = exam_type
-        result.month = month
+
+        # kama month column ipo
+        if hasattr(result, "month"):
+            result.month = month
 
         # =========================
-        # CALCULATION (HAIJABADILISHWA)
+        # CALCULATIONS
         # =========================
         if pre_test == 0 and exam_marks == 0:
+
             total = test1 + test2
             average = total / 2 if (test1 or test2) else 0
+
         else:
+
             combined_test = (test2 + pre_test) / 2
             total = test1 + combined_test + exam_marks
-            average = total / 3 if (test1 or test2 or exam_marks) else 0
+            average = total / 3 if (
+                test1 or test2 or exam_marks
+            ) else 0
 
         result.total = total
         result.average = average
 
         # =========================
-        # GRADE (HAIJABADILISHWA)
+        # GRADE
         # =========================
         if average >= 75:
             result.grade = "A"
@@ -860,13 +881,34 @@ def upload_result():
     # =========================
     db.session.commit()
 
-    flash(f"{exam_type} results saved successfully!", "success")
+    print("\n========== DATABASE DEBUG ==========")
+
+    all_results = StudentResult.query.filter_by(
+        subject=subject,
+        class_level=class_level
+    ).all()
+
+    for r in all_results:
+        print(
+            repr(r.subject),
+            repr(r.class_level),
+            repr(r.term),
+            repr(r.exam_type),
+            repr(r.academic_year)
+        )
+
+    print("====================================\n")
+
+    flash(
+        f"{exam_type} results saved successfully!",
+        "success"
+    )
+
     return redirect('/teacher')
 
 from flask import session, redirect, render_template
 from datetime import datetime
 from collections import defaultdict
-
 @app.route('/student')
 def student_dashboard():
 
@@ -880,7 +922,7 @@ def student_dashboard():
     student = User.query.get(student_id)
 
     # =========================
-    # GET SUBJECTS BY COMBINATION
+    # SUBJECTS FILTER
     # =========================
     subjects_query = Subject.query.filter_by(
         class_level=student.class_level
@@ -898,36 +940,96 @@ def student_dashboard():
         subjects_allowed = [s.name for s in subjects_query]
 
     # =========================
-    # GET RESULTS (FILTERED BY COMBINATION)
+    # GET RESULTS
     # =========================
     results = StudentResult.query.filter(
         StudentResult.student_id == student_id,
-        StudentResult.subject.in_(subjects_allowed)
+        StudentResult.subject.in_(subjects_allowed),
+        StudentResult.approved == True
     ).all()
 
-    approved_results = [r for r in results if r.approved]
+    approved = len(results) > 0
 
-    approved = len(approved_results) > 0
     exam_type = next((r.exam_type for r in results if r.exam_type), None)
+
+    # =========================
+    # 🔥 REMOVE DUPLICATES + GROUP PROPERLY
+    # =========================
+    subject_map = {}
+
+    for r in results:
+
+        key = r.subject
+
+        if key not in subject_map:
+            subject_map[key] = {
+                "midterm": None,
+                "terminal": None,
+                "annual": None
+            }
+
+        if r.exam_type == "Midterm":
+            subject_map[key]["midterm"] = r
+
+        elif r.exam_type == "Terminal":
+            subject_map[key]["terminal"] = r
+
+        elif r.exam_type == "Annual":
+            subject_map[key]["annual"] = r
+
+    # =========================
+    # 🔥 CALCULATION (SAME AS TEACHER)
+    # =========================
+    processed_subjects = []
+
+    for subject, d in subject_map.items():
+
+        mid = d["midterm"]
+        term_rec = d["terminal"] or d["annual"]
+
+        # -------------------------
+        # MIDTERM ONLY
+        # -------------------------
+        if mid and not term_rec:
+
+            t1 = mid.test1 or 0
+            t2 = mid.test2 or 0
+
+            avg = (t1 + t2) / 2 if (t1 or t2) else 0
+
+        # -------------------------
+        # TERMINAL / ANNUAL
+        # -------------------------
+        elif term_rec:
+
+            t1 = mid.test1 if mid else 0
+            t2 = mid.test2 if mid else 0
+            pre = term_rec.pre_test or 0
+            exam = term_rec.exam_marks or 0
+
+            combined_test = (t2 + pre) / 2
+            total = t1 + combined_test + exam
+
+            avg = total / 3 if (t1 or t2 or pre or exam) else 0
+
+        else:
+            avg = 0
+
+        processed_subjects.append(avg)
 
     # =========================
     # TOTAL & AVERAGE
     # =========================
-    student_total_marks = sum([r.total or 0 for r in approved_results])
+    student_total_marks = sum(processed_subjects)
 
-    if approved_results:
-        average_marks = sum([r.average or 0 for r in approved_results]) / len(approved_results)
-    else:
-        average_marks = 0
+    average_marks = (
+        sum(processed_subjects) / len(processed_subjects)
+        if processed_subjects else 0
+    )
 
     # =========================
-    # RANK (WITH COMBINATION FILTER)
+    # RANK
     # =========================
-    total_students = User.query.filter_by(
-        class_level=student.class_level,
-        role='student'
-    ).count()
-
     class_results = StudentResult.query.filter(
         StudentResult.class_level == student.class_level,
         StudentResult.subject.in_(subjects_allowed),
@@ -967,21 +1069,21 @@ def student_dashboard():
         r.can_view = r.approved
 
     # =========================
-    # BEST 7 DIVISION SYSTEM
+    # DIVISION
     # =========================
     points_map = {"A": 1, "B": 2, "C": 3, "D": 4, "F": 5}
 
     subject_points = []
 
-    for r in approved_results:
+    for r in results:
         if r.grade in points_map:
             subject_points.append(points_map[r.grade])
 
     division = None
     total_points = None
+    division_display = None
 
     if len(subject_points) >= 7:
-
         best7 = sorted(subject_points)[:7]
         total_points = sum(best7)
 
@@ -995,11 +1097,13 @@ def student_dashboard():
             division = "IV"
         else:
             division = "0"
+
+        division_display = f"Division {division}-{total_points}"      
     else:
-        division = "Incomplete"
+        division_display = "Incomplete"
 
     # =========================
-    # PROFILE
+    # PROFILE (FIXED)
     # =========================
     profile = student.profile
 
@@ -1020,29 +1124,18 @@ def student_dashboard():
     resources = Resource.query.all()
     events = Event.query.order_by(Event.created_at.desc()).all()
 
-    # =========================
-    # DATE INFO
-    # =========================
     now = datetime.now()
-    exam_month = now.strftime("%B")
-    exam_year = now.year
 
-    # =========================
-    # FINAL OUTPUT
-    # =========================
     return render_template(
         'student/dashboard.html',
 
         student=student,
         results=results,
         approved=approved,
-
         exam_type=exam_type,
 
         rank=rank,
-        total_students=total_students,
-
-        division=division,
+        division=division_display,
         total_points=total_points,
 
         student_total_marks=student_total_marks,
@@ -1050,13 +1143,12 @@ def student_dashboard():
 
         profile=profile_data,
 
-        exam_month=exam_month,
-        exam_year=exam_year,
+        exam_month=now.strftime("%B"),
+        exam_year=now.year,
 
         resources=resources,
         events=events,
 
-        # 🔥 IMPORTANT: show combination
         combination=student.combination,
         subjects_allowed=subjects_allowed
     )
@@ -1350,24 +1442,28 @@ def class_teacher_dashboard():
 
 @app.route('/admin/approve-student/<int:student_id>', methods=['POST'])
 def approve_student(student_id):
-    # pata matokeo yote ya student hayajapewa approve
-    results = StudentResult.query.filter_by(student_id=student_id, approved=False).all()
+
+    exam_type = request.form.get('exam_type')
+
+    # 🔥 CHUKUA ZOTE za student (sio only unapproved)
+    query = StudentResult.query.filter_by(student_id=student_id)
+
+    if exam_type:
+        query = query.filter_by(exam_type=exam_type)
+
+    results = query.all()
 
     if not results:
-        return jsonify({"error": "No results to approve"}), 404
-
-    # pata exam_type kutoka request
-    exam_type = request.form.get('exam_type') or request.json.get('exam_type')
+        return jsonify({"error": "No results found"}), 404
 
     for r in results:
         r.approved = True
         if exam_type:
-            r.exam_type = exam_type  # save exam type
+            r.exam_type = exam_type
 
-    db.session.commit()  # commit DB
+    db.session.commit()
 
     return jsonify({"success": True})
-
 
 @app.route("/teacher/save-student-requirements", methods=["POST"])
 def save_student_requirements():
@@ -1627,8 +1723,6 @@ def update_subject():
     flash("Subject updated successfully", "success")
 
     return redirect("/admin")
-
-
 @app.route('/teacher/view-results')
 def view_results():
 
@@ -1638,61 +1732,152 @@ def view_results():
     subject = request.args.get('subject')
     class_level = request.args.get('class_level')
     term = request.args.get('term')
-    academic_year = request.args.get('year')
+    exam_type = request.args.get('exam_type')
+    year = request.args.get('year')
 
-    results = StudentResult.query.filter_by(
+    academic_year = int(year) if year else None
+
+    print("\n========== VIEW DEBUG ==========")
+    print(subject, class_level, term, exam_type, academic_year)
+    print("================================\n")
+
+    all_results = StudentResult.query.filter_by(
         subject=subject,
         class_level=class_level,
         term=term,
         academic_year=academic_year
-    ).order_by(StudentResult.average.desc()).all()
+    ).all()
+
+    data_map = {}
+
+    for r in all_results:
+
+        sid = r.student_id
+
+        if sid not in data_map:
+            data_map[sid] = {
+                "student": r.student,
+                "midterm": None,
+                "terminal": None,
+                "annual": None
+            }
+
+        if r.exam_type == "Midterm":
+            data_map[sid]["midterm"] = r
+
+        elif r.exam_type == "Terminal":
+            data_map[sid]["terminal"] = r
+
+        elif r.exam_type == "Annual":
+            data_map[sid]["annual"] = r
+
+    final_results = []
+
+    for sid, d in data_map.items():
+
+        mid = d["midterm"]
+        term_rec = d["terminal"]
+        annual = d["annual"]
+
+        # =========================
+        # COMMON VALUES
+        # =========================
+        t1 = mid.test1 if mid else 0
+        t2 = mid.test2 if mid else 0
+
+        pre = term_rec.pre_test if term_rec else 0
+        exam = term_rec.exam_marks if term_rec else 0
+
+        # =========================
+        # LOGIC FIXED
+        # =========================
+
+        if exam_type == "Midterm":
+            total = t1 + t2
+            average = total / 2 if (t1 or t2) else 0
+
+        elif exam_type in ["Terminal", "Annual"]:
+            # 🔥 Annual = SAME AS Terminal (as you requested)
+            combined_test = (t2 + pre) / 2
+            total = t1 + combined_test + exam
+            average = total / 3 if (t1 or t2 or pre or exam) else 0
+
+        else:
+            total = t1 + t2 + pre + exam
+            average = total / 4 if (t1 or t2 or pre or exam) else 0
+
+        # =========================
+        # GRADE
+        # =========================
+        if average >= 75:
+            grade = "A"
+        elif average >= 65:
+            grade = "B"
+        elif average >= 45:
+            grade = "C"
+        elif average >= 30:
+            grade = "D"
+        else:
+            grade = "F"
+
+        final_results.append({
+            "student": d["student"],
+            "test1": t1,
+            "test2": t2,
+            "pre_test": pre,
+            "exam_marks": exam,
+            "total": total,
+            "average": average,
+            "grade": grade
+        })
 
     return render_template(
         "teacher/view_results.html",
-        results=results,
+        results=final_results,
         subject=subject,
         class_level=class_level,
         term=term,
-        academic_year=academic_year
+        academic_year=academic_year,
+        exam_type=exam_type
     )
 
-@app.route('/teacher/download-results')
-def download_results():
+# @app.route('/teacher/download-results')
+# def download_results():
 
-    if 'role' not in session or session['role'] != 'teacher':
-        return redirect('/login')
+#     if 'role' not in session or session['role'] != 'teacher':
+#         return redirect('/login')
 
-    subject = request.args.get('subject')
-    class_level = request.args.get('class_level')
-    term = request.args.get('term')
-    academic_year = request.args.get('academic_year')
+#     subject = request.args.get('subject')
+#     class_level = request.args.get('class_level')
+#     term = request.args.get('term')
+#     academic_year = request.args.get('academic_year')
 
-    results = StudentResult.query.options(
-        joinedload(StudentResult.student)
-    ).filter_by(
-        subject=subject,
-        class_level=class_level,
-        term=term,
-        academic_year=academic_year
-    ).order_by(StudentResult.average.desc()).all()
+#     results = StudentResult.query.options(
+#         joinedload(StudentResult.student)
+#     ).filter_by(
+#         subject=subject,
+#         class_level=class_level,
+#         term=term,
+#         academic_year=academic_year
+#     ).order_by(StudentResult.average.desc()).all()
 
-    def generate():
+#     def generate():
 
-        yield "Position,Student,Test1,Test2,PreTest,Exam,Total,Average,Grade\n"
+#         yield "Position,Student,Test1,Test2,PreTest,Exam,Total,Average,Grade\n"
 
-        position = 1
+#         position = 1
 
-        for r in results:
+#         for r in results:
 
-            yield f"{position},{r.student.username},{r.test1},{r.test2},{r.pre_test},{r.exam_marks},{r.total},{round(r.average,2)},{r.grade}\n"
+#             yield f"{position},{r.student.username},{r.test1},{r.test2},{r.pre_test},{r.exam_marks},{r.total},{round(r.average,2)},{r.grade}\n"
 
-            position += 1
+#             position += 1
 
-    return Response(
-        generate(),
-        mimetype='text/csv',
-        headers={"Content-Disposition":"attachment; filename=results.csv"}
-    )
+#     return Response(
+#         generate(),
+#         mimetype='text/csv',
+#         headers={"Content-Disposition":"attachment; filename=results.csv"}
+#     )
 
 
 @app.route('/teacher/send-to-admin', methods=['POST'])
@@ -1887,6 +2072,24 @@ def filter_results():
     except Exception as e:
         print("ERROR:", e)
         return "Server error", 500
+    
+
+@app.route('/admin/download-results')
+def download_results():
+
+    class_level = request.args.get('class')
+    term = request.args.get('term')
+    exam_type = request.args.get('exam_type')
+    year = request.args.get('year')
+
+    results = StudentResult.query.filter(
+        StudentResult.class_level == class_level,
+        StudentResult.term == term,
+        StudentResult.exam_type == exam_type,
+        StudentResult.academic_year == int(year)
+    ).all()
+
+    return render_template("pdf_template.html", results=results, class_level=class_level)    
     
 
 if __name__ == "__main__": 

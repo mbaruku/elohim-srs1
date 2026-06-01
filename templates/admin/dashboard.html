@@ -194,7 +194,8 @@ Wanafunzi: {{ students }}
         </button>
       </h2>
 
-      <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
+      <div id="collapse{{ loop.index }}"
+     class="accordion-collapse collapse">
         <div class="accordion-body">
 
           {% if data.rows %}
@@ -245,10 +246,11 @@ Wanafunzi: {{ students }}
         <label class="form-label d-block">&nbsp;</label>
 
         <button class="btn btn-danger download-pdf"
-                data-form="{{ form }}">
-            <i class="fa-solid fa-file-pdf"></i>
-            Download PDF
-        </button>
+        data-form="{{ form }}"
+        data-class="{{ form }}">
+    <i class="fa-solid fa-file-pdf"></i>
+    Download PDF
+</button>
     </div>
 
 </div>
@@ -347,7 +349,7 @@ Wanafunzi: {{ students }}
 
 <td>
 
-{% if row.complete %}
+{% if row.approved %}
 
 <button type="button"
 class="btn btn-success btn-sm approve-btn"
@@ -660,13 +662,24 @@ Cancel
 
   // Download PDF validation
   $('.download-pdf').click(function(e){
-    var form=$(this).data('form')
-    var examType=$('.exam-type[data-form="'+form+'"]').val()
-    if(examType==""){
-      alert("Chagua Type of Exam kabla ya kudownload PDF")
-      e.preventDefault()
+    e.preventDefault()
+
+    let form = $(this).data('form')
+    let classLevel = $(this).data('class')
+
+    let examType = $('.exam-type[data-form="'+form+'"]').val()
+    let term = $('.term-select[data-form="'+form+'"]').val()
+    let year = $('.year-input').val()
+
+    if(!examType || !term || !year){
+        alert("Chagua Term, Exam Type na Mwaka kwanza")
+        return
     }
-  })    
+
+    let url = `/admin/download-results?class=${encodeURIComponent(classLevel)}&term=${encodeURIComponent(term)}&exam_type=${encodeURIComponent(examType)}&year=${year}`
+
+    window.location.href = url
+})    
 
 $(document).ready(function(){
 
@@ -828,15 +841,22 @@ function setEditSubject(id, name, class_level, category) {
     "/admin/edit-subject/" + id;
 }
 
-$('.term-select, .exam-type, .year-input').on('change', function () {
+$(document).on('change', '.term-select, .exam-type, .year-input', function () {
 
-    var form = $(this).data('form');
+    let form = $(this).data('form');
 
-    var term = $('.term-select[data-form="'+form+'"]').val();
-    var examType = $('.exam-type[data-form="'+form+'"]').val();
-    var year = $('.year-input').val();
+    let term = $('.term-select[data-form="'+form+'"]').val();
+    let examType = $('.exam-type[data-form="'+form+'"]').val();
+    let year = $('.year-input').val();
 
     if (!term || !examType || !year) return;
+
+    // SAVE OPEN ACCORDION
+    let openAccordions = [];
+
+    $('.accordion-collapse.show').each(function () {
+        openAccordions.push(this.id);
+    });
 
     $.ajax({
         url: "/admin",
@@ -846,16 +866,24 @@ $('.term-select, .exam-type, .year-input').on('change', function () {
             exam_type: examType,
             year: year
         },
-        success: function (response) {
+        success: function(response){
 
-            // replace ONLY results section
-            let html = $(response).find("#resultsAccordion").html();
+            let newHTML = $(response)
+                .find("#resultsAccordion")
+                .html();
 
-            $("#resultsAccordion").html(html);
+            $("#resultsAccordion").html(newHTML);
+
+            // REOPEN
+            openAccordions.forEach(id => {
+                $("#" + id).addClass("show");
+            });
+
         }
     });
-});
 
+});
+  
 
 $(document).on('shown.bs.collapse', function (e) {
     localStorage.setItem('openAccordion', e.target.id);
@@ -867,6 +895,76 @@ $(document).ready(function(){
         $('#' + open).addClass('show');
     }
 });
+
+function rebindAdminFilters(){
+
+    $('.term-select, .exam-type, .year-input').off('change').on('change', function () {
+
+        var form = $(this).data('form');
+
+        var term = $('.term-select[data-form="'+form+'"]').val();
+        var examType = $('.exam-type[data-form="'+form+'"]').val();
+        var year = $('.year-input').val();
+
+        if (!term || !examType || !year) return;
+
+        $.ajax({
+            url: "/admin",
+            method: "GET",
+            data: {
+                term: term,
+                exam_type: examType,
+                year: year
+            },
+          success: function (response) {
+
+    // 🔥 BEFORE REPLACE: save open accordions
+    let openAccordions = [];
+
+    $('.accordion-collapse.show').each(function () {
+        openAccordions.push(this.id);
+    });
+
+    // 🔥 GET NEW HTML
+    let newAccordion = $(response).find("#resultsAccordion").html();
+
+    // 🔥 REPLACE CONTENT
+    $("#resultsAccordion").html(newAccordion);
+
+    // 🔥 RESTORE OPEN STATE
+    openAccordions.forEach(id => {
+        let el = document.getElementById(id);
+        if (el) {
+            new bootstrap.Collapse(el, { show: true });
+        }
+    });
+}
+        });
+    });
+
+}
+
+
+$(document).on('shown.bs.collapse', '.accordion-collapse', function () {
+
+    localStorage.setItem(
+        'last_open_accordion',
+        this.id
+    );
+
+});
+
+
+$(document).on('shown.bs.collapse', '.accordion-collapse', function () {
+
+    localStorage.setItem(
+        'last_open_accordion',
+        this.id
+    );
+
+});
+
+
 </script>
 
 </body>

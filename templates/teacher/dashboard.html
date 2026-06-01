@@ -190,7 +190,7 @@ View Results
 </button>
 
 
-<div class="modal fade" id="viewResultsModal_{{ loop.index }}">
+<div class="modal fade" id="viewResultsModal_{{ loop.index }}" tabindex="-1">
 <div class="modal-dialog">
 
 <form method="GET" action="/teacher/view-results">
@@ -201,12 +201,9 @@ View Results
 <div class="modal-content">
 
 <div class="modal-header bg-info text-white">
-
 <h5 class="modal-title">
-
 <i class="fa-solid fa-chart-bar"></i>
 View Results - {{ subject.subject }}
-
 </h5>
 
 <button class="btn-close btn-close-white"
@@ -216,19 +213,41 @@ data-bs-dismiss="modal"></button>
 
 <div class="modal-body">
 
+<!-- TERM -->
 <div class="mb-3">
 
 <label>Term</label>
 
 <select name="term" class="form-control" required>
+
 <option value="">Select Term</option>
+
 <option value="Term 1">Term 1</option>
 <option value="Term 2">Term 2</option>
 <option value="Term 3">Term 3</option>
+
 </select>
 
 </div>
 
+<!-- EXAM TYPE -->
+<div class="mb-3">
+
+<label>Exam Type</label>
+
+<select name="exam_type" class="form-control" required>
+
+<option value="">Select Exam Type</option>
+
+<option value="Midterm">Midterm</option>
+<option value="Terminal">Terminal</option>
+<option value="Annual">Annual</option>
+
+</select>
+
+</div>
+
+<!-- YEAR -->
 <div class="mb-3">
 
 <label>Academic Year</label>
@@ -236,7 +255,7 @@ data-bs-dismiss="modal"></button>
 <input type="number"
 name="year"
 class="form-control"
-placeholder="Example: 2026"
+value="{{ current_year }}"
 required>
 
 </div>
@@ -245,7 +264,7 @@ required>
 
 <div class="modal-footer">
 
-<button class="btn btn-info">
+<button type="submit" class="btn btn-info">
 
 <i class="fa-solid fa-eye"></i>
 View Results
@@ -259,12 +278,13 @@ View Results
 </form>
 
 </div>
+
 </div>
 
 
 <!-- Upload Results Modal -->
 
-<div class="modal fade" id="uploadTestsModal_{{ loop.index }}">
+<div class="modal fade" id="uploadTestsModal_{{ loop.index }}" tabindex="-1">
 <div class="modal-dialog modal-xl">
 
 <form method="POST" action="/teacher/upload-result">
@@ -275,6 +295,8 @@ View Results
 
 <input type="hidden" name="term" class="term-hidden">
 <input type="hidden" name="academic_year" class="year-hidden">
+<input type="hidden" name="exam_type" class="examtype-hidden">
+<input type="hidden" name="month" class="month-hidden">
 
 <div class="modal-content">
 
@@ -302,7 +324,10 @@ View Results
 {% for student in subject_students_map.get(subject.id, []) %}
 <tr>
 
-<td>{{ student.username }}</td>
+<td>
+    <input type="hidden" name="student_ids[]" value="{{ student.id }}">
+    {{ student.username }}
+</td>
 
 <td><input type="number" name="test1_{{ student.id }}" class="form-control test1-input"></td>
 <td><input type="number" name="test2_{{ student.id }}" class="form-control test2-input"></td>
@@ -329,7 +354,7 @@ View Results
 </div>
 
 
-<div class="modal fade" id="uploadExamModal_{{ loop.index }}">
+<div class="modal fade" id="uploadExamModal_{{ loop.index }}" tabindex="-1">
 <div class="modal-dialog modal-xl">
 
 <form method="POST" action="/teacher/upload-result">
@@ -341,6 +366,7 @@ View Results
 <input type="hidden" name="term" class="term-hidden">
 <input type="hidden" name="academic_year" class="year-hidden">
 <input type="hidden" name="exam_type" class="examtype-hidden">
+<input type="hidden" name="month" class="month-hidden">
 
 <div class="modal-content">
 

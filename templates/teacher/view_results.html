@@ -76,67 +76,37 @@ Year: {{ academic_year }}
 </thead>
 
 <tbody>
-
 {% for r in results %}
 
 <tr>
 
 <td>{{ loop.index }}</td>
-
 <td>{{ r.student.username }}</td>
 
-<!-- TEST 1 -->
+<!-- MIDTERM ONLY -->
+{% if exam_type == "Midterm" %}
 
-<td>
-<span class="view-mode">{{ r.test1 or 0 }}</span>
+<td>{{ r.test1 }}</td>
+<td>{{ r.test2 }}</td>
+<td>-</td>
+<td>-</td>
 
-<input class="form-control edit-mode"
-name="test1_{{ r.id }}"
-value="{{ r.test1 }}">
-</td>
+{% elif exam_type in ["Terminal", "Annual"] %}
 
-<!-- TEST 2 -->
+<td>{{ r.test1 }}</td>
+<td>{{ r.test2 }}</td>
+<td>{{ r.pre_test }}</td>
+<td>{{ r.exam_marks }}</td>
 
-<td>
-<span class="view-mode">{{ r.test2 or 0 }}</span>
-
-<input class="form-control edit-mode"
-name="test2_{{ r.id }}"
-value="{{ r.test2 }}">
-</td>
-
-<!-- PRE TEST -->
-
-<td>
-<span class="view-mode">{{ r.pre_test or 0 }}</span>
-
-<input class="form-control edit-mode"
-name="pretest_{{ r.id }}"
-value="{{ r.pre_test }}">
-</td>
-
-<!-- EXAM -->
-
-<td>
-<span class="view-mode">{{ r.exam_marks or 0 }}</span>
-
-<input class="form-control edit-mode"
-name="exam_{{ r.id }}"
-value="{{ r.exam_marks }}">
-</td>
+{% endif %}
 
 <td>{{ r.total }}</td>
-
 <td>{{ r.average|round(2) }}</td>
-
-<td>
-<span class="badge bg-success">{{ r.grade }}</span>
-</td>
+<td><span class="badge bg-success">{{ r.grade }}</span></td>
 
 </tr>
 
 {% endfor %}
-
 </tbody>
 
 </table>

@@ -382,36 +382,74 @@ data-bs-target="#viewResultsModal_{{ loop.index }}">
 
 <div class="modal-header bg-info text-white">
 <h5 class="modal-title">
-<i class="fa-solid fa-chart-bar"></i> View Results - {{ subject.subject }}
+<i class="fa-solid fa-chart-bar"></i>
+View Results - {{ subject.subject }}
 </h5>
-<button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
+<button class="btn-close btn-close-white"
+data-bs-dismiss="modal"></button>
+
 </div>
 
 <div class="modal-body">
 
+<!-- TERM -->
 <div class="mb-3">
+
 <label>Term</label>
+
 <select name="term" class="form-control" required>
+
 <option value="">Select Term</option>
+
 <option value="Term 1">Term 1</option>
 <option value="Term 2">Term 2</option>
 <option value="Term 3">Term 3</option>
+
 </select>
+
 </div>
 
+<!-- EXAM TYPE -->
 <div class="mb-3">
+
+<label>Exam Type</label>
+
+<select name="exam_type" class="form-control" required>
+
+<option value="">Select Exam Type</option>
+
+<option value="Midterm">Midterm</option>
+<option value="Terminal">Terminal</option>
+<option value="Annual">Annual</option>
+
+</select>
+
+</div>
+
+<!-- YEAR -->
+<div class="mb-3">
+
 <label>Academic Year</label>
-<input type="number" name="year" class="form-control" required>
+
+<input type="number"
+name="year"
+class="form-control"
+value="{{ current_year }}"
+required>
+
 </div>
 
 </div>
 
 <div class="modal-footer">
 
-    <button class="btn btn-info">
-        <i class="fa-solid fa-eye"></i>
-        View Results
-    </button>
+<button type="submit" class="btn btn-info">
+
+<i class="fa-solid fa-eye"></i>
+View Results
+
+</button>
 
 </div>
 

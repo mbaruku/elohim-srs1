@@ -87,7 +87,7 @@ class StudentResult(db.Model):
 
     # FINAL EXAM
     exam_type = db.Column(db.String(50))  # Terminal / Annual
-    exam_marks = db.Column(db.Float, default=0.0)
+    exam_marks = db.Column(db.Float, nullable=True)
 
     # RESULTS
     total = db.Column(db.Float, default=0.0)

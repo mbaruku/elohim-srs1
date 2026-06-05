@@ -107,96 +107,88 @@ Masomo Unayofundisha
 
 {% for subject in subjects %}
 
-<div class="card mb-3">
+<div class="card mb-3 border">
+<div class="card-body d-flex justify-content-between align-items-start">
 
-<div class="card-body d-flex justify-content-between align-items-center">
+    <!-- LEFT -->
+    <div>
 
-<div>
+        <strong>
+            <i class="fa-solid fa-book-open"></i>
+            {{ subject.subject }}
+        </strong>
+        - {{ subject.class_level }}
 
-<strong>{{ subject.subject }}</strong>
+        <!-- CONTROL PANEL (CLASS TEACHER + NORMAL TEACHER SAME UI) -->
+        <div class="mb-3 p-3 border rounded bg-light mt-3">
 
-- {{ subject.class_level }}
+            <div class="row g-3">
 
-</div>
+                <!-- TERM -->
+                <div class="col-md-3">
+                    <label>Term</label>
+                    <select class="form-select term-select" data-subject="{{ subject.id }}">
+                        <option value="">-- Select --</option>
+                        <option value="Term 1">Term 1</option>
+                        <option value="Term 2">Term 2</option>
+                        <option value="Term 3">Term 3</option>
+                    </select>
+                </div>
 
-<div class="w-100 mb-3 p-3 border rounded bg-light">
+                <!-- EXAM TYPE -->
+                <div class="col-md-3">
+                    <label>Exam Type</label>
+                    <select class="form-select examtype-select" data-subject="{{ subject.id }}">
+                        <option value="">-- Select --</option>
+                        <option value="Midterm">Midterm</option>
+                        <option value="Terminal">Terminal</option>
+                        <option value="Annual">Annual</option>
+                    </select>
+                </div>
 
-    <div class="row g-3">
+                <!-- MONTH -->
+                <div class="col-md-3">
+                    <label>Month</label>
+                    <input type="text" class="form-control month-input" data-subject="{{ subject.id }}">
+                </div>
 
-        <!-- TERM -->
-        <div class="col-md-3">
-            <label>Term</label>
-            <select class="form-select term-select" data-subject="{{ subject.id }}">
-                <option value="">-- Select Term --</option>
-                <option value="Term 1">Term 1</option>
-                <option value="Term 2">Term 2</option>
-            </select>
-        </div>
+                <!-- YEAR -->
+                <div class="col-md-3">
+                    <label>Year</label>
+                    <input type="number" class="form-control year-input" data-subject="{{ subject.id }}">
+                </div>
 
-        <!-- EXAM TYPE -->
-        <div class="col-md-3">
-            <label>Exam Type</label>
-            <select class="form-select examtype-select" data-subject="{{ subject.id }}">
-                <option value="">-- Select Type --</option>
-                <option value="Midterm">Midterm</option>
-                <option value="Terminal">Terminal</option>
-                <option value="Annual">Annual</option>
-            </select>
-        </div>
+            </div>
 
-        <!-- MONTH -->
-        <div class="col-md-3">
-            <label>Month</label>
-            <input type="text" class="form-control month-input" data-subject="{{ subject.id }}">
-        </div>
-
-        <!-- YEAR -->
-        <div class="col-md-3">
-            <label>Year</label>
-            <input type="number" class="form-control year-input" data-subject="{{ subject.id }}">
         </div>
 
     </div>
 
-</div>
-
-
-<div>
-
-    <!-- UPLOAD TESTS -->
-    <button id="uploadTestsBtn_{{ subject.id }}"
-            class="btn btn-primary me-2"
-            data-bs-toggle="modal"
-            data-bs-target="#uploadTestsModal_{{ subject.id }}">
-        <i class="fa-solid fa-vial"></i>
-        Upload Tests
-    </button>
-
-    <!-- UPLOAD EXAM -->
-    <button id="uploadExamBtn_{{ subject.id }}"
-            class="btn btn-success"
-            data-bs-toggle="modal"
-            data-bs-target="#uploadExamModal_{{ subject.id }}">
-        <i class="fa-solid fa-graduation-cap"></i>
-        Upload Final Exam
-    </button>
-
-</div>
-
-<button class="btn btn-info"
-data-bs-toggle="modal"
-data-bs-target="#viewResultsModal_{{ loop.index }}">
-<i class="fa-solid fa-chart-bar"></i> View Results
+    <!-- RIGHT BUTTONS -->
+    <div>
+<button class="btn btn-primary upload-btn"
+        data-subject="{{ subject.id }}"
+        data-bs-toggle="modal"
+        data-bs-target="#uploadTestsModal_{{ subject.id }}">
+    Upload Result
 </button>
-</div>
 
+        <button class="btn btn-info"
+                data-bs-toggle="modal"
+                data-bs-target="#viewResultsModal_{{ subject.id }}"
+            View Results
+        </button>
+
+    </div>
+
+</div>
 </div>
 
 
 
 <!-- UPLOAD RESULTS MODAL -->
 
-<div class="modal fade" id="uploadTestsModal_{{ subject.id }}"> tabindex="-1">
+<div class="modal fade" id="uploadTestsModal_{{ subject.id }}" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
 
     <form method="POST" action="/teacher/upload-result">
@@ -322,7 +314,6 @@ data-bs-target="#viewResultsModal_{{ loop.index }}">
             <thead class="table-dark">
               <tr>
                 <th>Mwanafunzi</th>
-                <th>Pre Test</th>
                 <th>Exam</th>
                 <th>Total</th>
                 <th>Average</th>
@@ -340,7 +331,7 @@ data-bs-target="#viewResultsModal_{{ loop.index }}">
                 </td>
 
                 <td>
-                  <input type="number" name="pre_test_{{ student.id }}" class="form-control pretest-input">
+                 <input type="number" name="exam_{{ student.id }}" class="form-control exam-input">
                 </td>
 
                 <td>
@@ -370,7 +361,7 @@ data-bs-target="#viewResultsModal_{{ loop.index }}">
   </div>
 </div>
 
-<div class="modal fade" id="viewResultsModal_{{ loop.index }}" tabindex="-1">
+<div class="modal fade" id="viewResultsModal_{{ subject.id }}">
 <div class="modal-dialog">
 
 <form method="GET" action="/teacher/view-results">
@@ -819,218 +810,158 @@ Hakuna feedback kutoka kwa wanafunzi bado.
 <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/select2.min.js') }}"></script>
-
 <script>
-$(document).ready(function(){
+$(document).ready(function () {
 
-  // Optional: automatic total and average calculation
-  $('.mark-input, .exam-mark-input').on('input', function(){
-      var row = $(this).closest('tr');
-      var t1 = parseFloat(row.find('input[name^="test1_"]').val()) || 0;
-      var t2 = parseFloat(row.find('input[name^="test2_"]').val()) || 0;
-      var exam = parseFloat(row.find('input[name^="exam_marks_"]').val()) || 0;
+    /* =============================
+       MONTH & YEAR AUTO FILL
+    ============================== */
+    document.querySelectorAll(".month-input").forEach(input => {
+        const months = ["January","February","March","April","May","June",
+            "July","August","September","October","November","December"];
 
-      var total = t1 + t2 + exam;
-      var average = total / 3;
-
-      row.find('.total-cell').text(total.toFixed(0));
-      row.find('.average-cell').text(average.toFixed(2));
-
-      // Optional: update grade
-      var grade = 'F';
-      if(average >= 70) grade='A';
-      else if(average >= 60) grade='B';
-      else if(average >= 50) grade='C';
-      else if(average >= 40) grade='D';
-      else grade='F';
-      row.find('.grade-cell').text(grade);
-  });
-
-});
-
-
-/* =============================
-   GRADE FUNCTION (GLOBAL)
-============================= */
-function getGrade(avg){
-    if(avg >= 75) return {text: "A", color: "green"};
-    if(avg >= 65) return {text: "B", color: "blue"};
-    if(avg >= 45) return {text: "C", color: "goldenrod"};
-    if(avg >= 30) return {text: "D", color: "orange"};
-    return {text: "F", color: "red"};
-}
-
-
-/* =============================
-   TESTS CALCULATION
-============================= */
-document.querySelectorAll(".tests-table tbody tr").forEach(row => {
-
-    const t1 = row.querySelector(".test1-input");
-    const t2 = row.querySelector(".test2-input");
-
-    const totalCell = row.querySelector(".total-cell");
-    const avgCell = row.querySelector(".average-cell");
-    const gradeCell = row.querySelector(".grade-cell");
-
-    function calculateTests() {
-
-        const v1 = parseFloat(t1.value) || 0;
-        const v2 = parseFloat(t2.value) || 0;
-
-        const total = v1 + v2;
-        const average = total / 2;
-
-        totalCell.textContent = total.toFixed(2);
-        avgCell.textContent = average.toFixed(2);
-
-        const g = getGrade(average);
-        gradeCell.textContent = g.text;
-        gradeCell.style.color = g.color;
-    }
-
-    t1.addEventListener("input", calculateTests);
-    t2.addEventListener("input", calculateTests);
-
-});
-
-
-/* =============================
-   EXAM CALCULATION
-============================= */
-document.querySelectorAll(".exam-table tbody tr").forEach(row => {
-
-    const pre = row.querySelector(".pretest-input");
-    const exam = row.querySelector(".exam-input");
-
-    const totalCell = row.querySelector(".total-cell");
-    const avgCell = row.querySelector(".average-cell");
-    const gradeCell = row.querySelector(".grade-cell");
-
-    function calculateExam() {
-
-        const p = parseFloat(pre.value) || 0;
-        const e = parseFloat(exam.value) || 0;
-
-        const total = p + e;
-        const avg = total / 2;
-
-        totalCell.textContent = total.toFixed(2);
-        avgCell.textContent = avg.toFixed(2);
-
-        const g = getGrade(avg);
-        gradeCell.textContent = g.text;
-        gradeCell.style.color = g.color;
-    }
-
-    pre.addEventListener("input", calculateExam);
-    exam.addEventListener("input", calculateExam);
-
-});
-
-
-
-
-function sendToAdmin(subject, class_level){
-
-    if(!confirm("Unataka kutuma results kwa admin?")) return;
-
-    fetch("/teacher/send-to-admin", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            subject: subject,
-            class_level: class_level
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        alert(data.message);
-    })
-    .catch(err => {
-        alert("Error sending results");
+        input.value = months[new Date().getMonth()];
     });
 
-}
+    document.querySelectorAll(".year-input").forEach(input => {
+        input.value = new Date().getFullYear();
+    });
 
 
-document.querySelectorAll(".month-input").forEach(input=>{
-    const months = ["January","February","March","April","May","June",
-        "July","August","September","October","November","December"];
-
-    input.value = months[new Date().getMonth()];
-});
-
-document.querySelectorAll(".year-input").forEach(input=>{
-    input.value = new Date().getFullYear();
-});
-
-
-document.querySelectorAll("[id^='uploadTestsBtn_']").forEach(b=>b.disabled=true);
-document.querySelectorAll("[id^='uploadExamBtn_']").forEach(b=>b.disabled=true);
-
-
-function updateButtons(subjectId){
-
-    const termEl = document.querySelector(`.term-select[data-subject="${subjectId}"]`);
-    const examEl = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`);
-
-    const uploadTestBtn = document.querySelector(`#uploadTestsBtn_${subjectId}`);
-    const uploadExamBtn = document.querySelector(`#uploadExamBtn_${subjectId}`);
-
-    if(!termEl || !examEl || !uploadTestBtn || !uploadExamBtn) return;
-
-    const term = termEl.value;
-    const examType = examEl.value;
-
-    // reset kwanza
-    uploadTestBtn.disabled = true;
-    uploadExamBtn.disabled = true;
-
-    if(!term || !examType) return;
-
-    if(examType === "Midterm"){
-        uploadTestBtn.disabled = false;
+    /* =============================
+       GRADE FUNCTION
+    ============================== */
+    function getGrade(avg){
+        if(avg >= 75) return {text: "A", color: "green"};
+        if(avg >= 65) return {text: "B", color: "blue"};
+        if(avg >= 45) return {text: "C", color: "goldenrod"};
+        if(avg >= 30) return {text: "D", color: "orange"};
+        return {text: "F", color: "red"};
     }
 
-    if(examType === "Terminal" || examType === "Annual"){
-        uploadExamBtn.disabled = false;
+
+    /* =============================
+       TEST CALCULATION (REALTIME)
+    ============================== */
+    $(document).on("input", ".test1-input, .test2-input", function () {
+
+        let row = $(this).closest("tr");
+
+        let t1 = parseFloat(row.find(".test1-input").val()) || 0;
+        let t2 = parseFloat(row.find(".test2-input").val()) || 0;
+
+        let total = t1 + t2;
+        let avg = total / 2;
+
+        let grade = getGrade(avg);
+
+        row.find(".total-cell").text(total.toFixed(2));
+        row.find(".average-cell").text(avg.toFixed(2));
+        row.find(".grade-cell").text(grade.text).css("color", grade.color);
+    });
+
+
+    /* =============================
+       EXAM CALCULATION (REALTIME)
+    ============================== */
+    $(document).on("input", ".exam-input", function () {
+
+        let row = $(this).closest("tr");
+
+        let t1 = parseFloat(row.find(".test1-input").val()) || 0;
+        let t2 = parseFloat(row.find(".test2-input").val()) || 0;
+        let ex = parseFloat(row.find(".exam-input").val()) || 0;
+
+        let total = t1 + t2 + ex;
+        let avg = total / 3;
+
+        let grade = getGrade(avg);
+
+        row.find(".total-cell").text(total.toFixed(2));
+        row.find(".average-cell").text(avg.toFixed(2));
+        row.find(".grade-cell").text(grade.text).css("color", grade.color);
+    });
+
+
+    /* =============================
+       PASS DATA TO MODAL (IMPORTANT FIX)
+    ============================== */
+    document.querySelectorAll("[id^='uploadTestsModal_'], [id^='uploadExamModal_']").forEach(modal => {
+
+        modal.addEventListener("show.bs.modal", function (event) {
+
+            const button = event.relatedTarget;
+            const subjectId = button?.getAttribute("data-subject");
+
+            if (!subjectId) return;
+
+            const termEl = document.querySelector(`.term-select[data-subject="${subjectId}"]`);
+            const examTypeEl = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`);
+            const yearEl = document.querySelector(`.year-input[data-subject="${subjectId}"]`);
+
+            const term = termEl ? termEl.value : "";
+            const examType = examTypeEl ? examTypeEl.value : "";
+            const year = yearEl ? yearEl.value : "";
+
+            const termHidden = modal.querySelector(".term-hidden");
+            const examHidden = modal.querySelector(".examtype-hidden");
+            const yearHidden = modal.querySelector(".year-hidden");
+
+            if (termHidden) termHidden.value = term;
+            if (examHidden) examHidden.value = examType;
+            if (yearHidden) yearHidden.value = year;
+        });
+    });
+
+
+    /* =============================
+       ENABLE / DISABLE LOGIC (OPTIONAL)
+    ============================== */
+    function updateButtons(subjectId){
+
+        const termEl = document.querySelector(`.term-select[data-subject="${subjectId}"]`);
+        const examEl = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`);
+
+        const enable = termEl?.value && examEl?.value;
+
+        const testBtn = document.querySelector(`#uploadTestsBtn_${subjectId}`);
+        const examBtn = document.querySelector(`#uploadExamBtn_${subjectId}`);
+
+        if (testBtn) testBtn.disabled = !enable;
+        if (examBtn) examBtn.disabled = !enable;
     }
-}
+
+    document.addEventListener("change", function(e){
+
+        if (
+            e.target.classList.contains("term-select") ||
+            e.target.classList.contains("examtype-select")
+        ) {
+            updateButtons(e.target.dataset.subject);
+        }
+    });
 
 
-document.addEventListener("change", function(e){
+    /* =============================
+       RESET MODAL (IMPORTANT FIX)
+    ============================== */
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('hidden.bs.modal', function () {
 
-    if(e.target.classList.contains("term-select") ||
-       e.target.classList.contains("examtype-select")){
+            modal.querySelectorAll('input, select').forEach(el => {
 
-        updateButtons(e.target.dataset.subject);
-    }
-
-});
-
-
-document.querySelectorAll("[id^='uploadTestsModal_'], [id^='uploadExamModal_']").forEach(modal => {
-
-    modal.addEventListener("show.bs.modal", function (event) {
-
-        const button = event.relatedTarget;
-        const subjectId = button.id.split("_")[1];
-
-        const term = document.querySelector(`.term-select[data-subject="${subjectId}"]`).value;
-        const examType = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`).value;
-        const year = document.querySelector(`.year-input[data-subject="${subjectId}"]`).value;
-
-        modal.querySelector(".term-hidden").value = term;
-        modal.querySelector(".year-hidden").value = year;
-        modal.querySelector(".examtype-hidden").value = examType;
-
+                if (
+                    el.classList.contains('term-hidden') ||
+                    el.classList.contains('year-hidden') ||
+                    el.classList.contains('examtype-hidden')
+                ) {
+                    el.value = "";
+                }
+            });
+        });
     });
 
 });
-
 </script>
 
 </body>

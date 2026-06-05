@@ -712,42 +712,22 @@ def get_grade_and_remarks(total):
 @app.route('/teacher/upload-result', methods=['POST'])
 def upload_result():
 
-    if 'role' not in session or session['role'] != 'teacher':
+    if session.get('role') != 'teacher':
         return redirect('/login')
 
-    # =========================
-    # FORM DATA
-    # =========================
     subject = request.form.get('subject')
     class_level = request.form.get('class_level')
     term = request.form.get('term')
     exam_type = request.form.get('exam_type')
     month = request.form.get('month')
-
-    # IMPORTANT
     academic_year = request.form.get('academic_year')
 
-    # =========================
-    # DEBUG FORM DATA
-    # =========================
-    print("\n========== FORM DEBUG ==========")
-    print("subject =", repr(subject))
-    print("class_level =", repr(class_level))
-    print("term =", repr(term))
-    print("academic_year =", repr(academic_year))
-    print("exam_type =", repr(exam_type))
-    print("month =", repr(month))
-    print("================================\n")
-
-    if not academic_year:
-        flash("Academic year missing!", "danger")
+    if not all([subject, class_level, term, exam_type, academic_year]):
+        flash("Missing required fields!", "danger")
         return redirect('/teacher')
 
     academic_year = int(academic_year)
 
-    # =========================
-    # GET SUBJECT
-    # =========================
     subject_obj = Subject.query.filter_by(
         name=subject,
         class_level=class_level
@@ -757,41 +737,18 @@ def upload_result():
         flash("Subject not found!", "danger")
         return redirect('/teacher')
 
-    subject_category = (subject_obj.category or "").strip().lower()
-
-    # =========================
-    # GET STUDENTS
-    # =========================
     students = User.query.filter_by(
         role='student',
         class_level=class_level
     ).all()
 
-    filtered_students = []
+    def safe_float(v):
+        try:
+            return float(v)
+        except:
+            return 0.0
 
     for student in students:
-
-        student_combination = (
-            student.combination or ""
-        ).strip().lower()
-
-        if subject_category == "both":
-            filtered_students.append(student)
-
-        elif subject_category == student_combination:
-            filtered_students.append(student)
-
-    if not filtered_students:
-        flash(
-            "No students found for this subject combination!",
-            "warning"
-        )
-        return redirect('/teacher')
-
-    # =========================
-    # SAVE RESULTS
-    # =========================
-    for student in filtered_students:
 
         sid = student.id
 
@@ -813,58 +770,27 @@ def upload_result():
                 academic_year=academic_year,
                 exam_type=exam_type
             )
-
             db.session.add(result)
 
-        # =========================
-        # INPUT MARKS
-        # =========================
-        test1 = request.form.get(f'test1_{sid}')
-        test2 = request.form.get(f'test2_{sid}')
-        pre_test = request.form.get(f'pretest_{sid}')
-        exam_marks = request.form.get(f'exam_marks_{sid}')
+        test1 = safe_float(request.form.get(f'test1_{sid}'))
+        test2 = safe_float(request.form.get(f'test2_{sid}'))
+        exam = safe_float(request.form.get(f'exam_{sid}')) if request.form.get(f'exam_{sid}') else None
 
-        test1 = float(test1) if test1 else (result.test1 or 0)
-        test2 = float(test2) if test2 else (result.test2 or 0)
-        pre_test = float(pre_test) if pre_test else (result.pre_test or 0)
-        exam_marks = float(exam_marks) if exam_marks else (result.exam_marks or 0)
-
-        # =========================
-        # SAVE MARKS
-        # =========================
         result.test1 = test1
         result.test2 = test2
-        result.pre_test = pre_test
-        result.exam_marks = exam_marks
 
-        result.exam_type = exam_type
-
-        # kama month column ipo
-        if hasattr(result, "month"):
-            result.month = month
-
-        # =========================
-        # CALCULATIONS
-        # =========================
-        if pre_test == 0 and exam_marks == 0:
-
+        if exam is not None:
+            result.exam_marks = exam
+            total = test1 + test2 + exam
+            average = total / 3
+        else:
+            result.exam_marks = None
             total = test1 + test2
             average = total / 2 if (test1 or test2) else 0
-
-        else:
-
-            combined_test = (test2 + pre_test) / 2
-            total = test1 + combined_test + exam_marks
-            average = total / 3 if (
-                test1 or test2 or exam_marks
-            ) else 0
 
         result.total = total
         result.average = average
 
-        # =========================
-        # GRADE
-        # =========================
         if average >= 75:
             result.grade = "A"
         elif average >= 65:
@@ -876,34 +802,9 @@ def upload_result():
         else:
             result.grade = "F"
 
-    # =========================
-    # SAVE DB
-    # =========================
     db.session.commit()
 
-    print("\n========== DATABASE DEBUG ==========")
-
-    all_results = StudentResult.query.filter_by(
-        subject=subject,
-        class_level=class_level
-    ).all()
-
-    for r in all_results:
-        print(
-            repr(r.subject),
-            repr(r.class_level),
-            repr(r.term),
-            repr(r.exam_type),
-            repr(r.academic_year)
-        )
-
-    print("====================================\n")
-
-    flash(
-        f"{exam_type} results saved successfully!",
-        "success"
-    )
-
+    flash("Results saved successfully!", "success")
     return redirect('/teacher')
 
 from flask import session, redirect, render_template
@@ -1726,7 +1627,7 @@ def update_subject():
 @app.route('/teacher/view-results')
 def view_results():
 
-    if 'role' not in session or session['role'] != 'teacher':
+    if session.get('role') != 'teacher':
         return redirect('/login')
 
     subject = request.args.get('subject')
@@ -1735,80 +1636,39 @@ def view_results():
     exam_type = request.args.get('exam_type')
     year = request.args.get('year')
 
-    academic_year = int(year) if year else None
+    try:
+        academic_year = int(year)
+    except:
+        academic_year = None
 
-    print("\n========== VIEW DEBUG ==========")
-    print(subject, class_level, term, exam_type, academic_year)
-    print("================================\n")
-
+    # ✅ SORTED QUERY (IMPORTANT FIX)
     all_results = StudentResult.query.filter_by(
         subject=subject,
         class_level=class_level,
         term=term,
-        academic_year=academic_year
-    ).all()
-
-    data_map = {}
-
-    for r in all_results:
-
-        sid = r.student_id
-
-        if sid not in data_map:
-            data_map[sid] = {
-                "student": r.student,
-                "midterm": None,
-                "terminal": None,
-                "annual": None
-            }
-
-        if r.exam_type == "Midterm":
-            data_map[sid]["midterm"] = r
-
-        elif r.exam_type == "Terminal":
-            data_map[sid]["terminal"] = r
-
-        elif r.exam_type == "Annual":
-            data_map[sid]["annual"] = r
+        academic_year=academic_year,
+        exam_type=exam_type
+    ).join(StudentResult.student)\
+     .order_by(Student.username.asc())\
+     .all()
 
     final_results = []
 
-    for sid, d in data_map.items():
+    for r in all_results:
 
-        mid = d["midterm"]
-        term_rec = d["terminal"]
-        annual = d["annual"]
+        t1 = r.test1 or 0
+        t2 = r.test2 or 0
+        exam = r.exam_marks or 0
 
-        # =========================
-        # COMMON VALUES
-        # =========================
-        t1 = mid.test1 if mid else 0
-        t2 = mid.test2 if mid else 0
-
-        pre = term_rec.pre_test if term_rec else 0
-        exam = term_rec.exam_marks if term_rec else 0
-
-        # =========================
-        # LOGIC FIXED
-        # =========================
-
+        # SIMPLE LOGIC
         if exam_type == "Midterm":
             total = t1 + t2
             average = total / 2 if (t1 or t2) else 0
-
-        elif exam_type in ["Terminal", "Annual"]:
-            # 🔥 Annual = SAME AS Terminal (as you requested)
-            combined_test = (t2 + pre) / 2
-            total = t1 + combined_test + exam
-            average = total / 3 if (t1 or t2 or pre or exam) else 0
-
         else:
-            total = t1 + t2 + pre + exam
-            average = total / 4 if (t1 or t2 or pre or exam) else 0
+            total = t1 + t2 + exam
+            average = total / 3 if (t1 or t2 or exam) else 0
 
-        # =========================
         # GRADE
-        # =========================
         if average >= 75:
             grade = "A"
         elif average >= 65:
@@ -1821,15 +1681,17 @@ def view_results():
             grade = "F"
 
         final_results.append({
-            "student": d["student"],
+            "student": r.student,
             "test1": t1,
             "test2": t2,
-            "pre_test": pre,
             "exam_marks": exam,
             "total": total,
             "average": average,
             "grade": grade
         })
+
+    # (Optional safety sort again in Python)
+    final_results.sort(key=lambda x: x["student"].username.lower())
 
     return render_template(
         "teacher/view_results.html",
@@ -1840,7 +1702,6 @@ def view_results():
         academic_year=academic_year,
         exam_type=exam_type
     )
-
 # @app.route('/teacher/download-results')
 # def download_results():
 

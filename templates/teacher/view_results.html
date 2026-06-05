@@ -65,9 +65,7 @@ Year: {{ academic_year }}
 
 <th>Test 1</th>
 <th>Test 2</th>
-<th>Pre Test</th>
 <th>Exam</th>
-
 <th>Total</th>
 <th>Average</th>
 <th>Grade</th>
@@ -82,26 +80,11 @@ Year: {{ academic_year }}
 
 <td>{{ loop.index }}</td>
 <td>{{ r.student.username }}</td>
-
-<!-- MIDTERM ONLY -->
-{% if exam_type == "Midterm" %}
-
 <td>{{ r.test1 }}</td>
 <td>{{ r.test2 }}</td>
-<td>-</td>
-<td>-</td>
-
-{% elif exam_type in ["Terminal", "Annual"] %}
-
-<td>{{ r.test1 }}</td>
-<td>{{ r.test2 }}</td>
-<td>{{ r.pre_test }}</td>
 <td>{{ r.exam_marks }}</td>
-
-{% endif %}
-
-<td>{{ r.total }}</td>
-<td>{{ r.average|round(2) }}</td>
+<td>{{ "%.2f"|format(r.total or 0) }}</td>
+<td>{{ "%.2f"|format(r.average or 0) }}</td>
 <td><span class="badge bg-success">{{ r.grade }}</span></td>
 
 </tr>
@@ -128,11 +111,6 @@ const editBtn = document.getElementById("editBtn");
 const saveBtn = document.getElementById("saveBtn");
 
 editBtn.addEventListener("click",function(){
-
-document.querySelectorAll(".view-mode").forEach(el=>el.style.display="none");
-
-document.querySelectorAll(".edit-mode").forEach(el=>el.style.display="block");
-
 editBtn.classList.add("d-none");
 saveBtn.classList.remove("d-none");
 

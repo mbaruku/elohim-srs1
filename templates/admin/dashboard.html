@@ -189,13 +189,17 @@ Wanafunzi: {{ students }}
   {% for form, data in class_results.items() %}
     <div class="accordion-item">
       <h2 class="accordion-header">
-        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}">
+        <button class="accordion-button collapsed"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#collapse{{ loop.index }}">
           <i class="fa-solid fa-school me-2"></i> {{ form }}
         </button>
       </h2>
 
       <div id="collapse{{ loop.index }}"
-     class="accordion-collapse collapse">
+     class="accordion-collapse collapse"
+     data-bs-parent="#resultsAccordion">
         <div class="accordion-body">
 
           {% if data.rows %}
@@ -627,38 +631,45 @@ Cancel
 <script>
 
 
-  // Approve results
-  $('.approve-btn').click(function(){
-    var btn=$(this)
-    var studentId=btn.data('student-id')
-    var form=btn.data('form')
-    var examType=$('.exam-type[data-form="'+form+'"]').val()
+$(document).on('click', '.approve-btn', function () {
 
-    if(examType==""){
-      alert("Chagua Type of Exam kwanza")
-      return
+    var btn = $(this);
+    var studentId = btn.data('student-id');
+    var form = btn.data('form');
+    var examType = $('.exam-type[data-form="'+form+'"]').val();
+
+    if (!examType) {
+        alert("Chagua Type of Exam kwanza");
+        return;
     }
 
-    btn.prop('disabled',true)
-    btn.find('.btn-text').text('Approving...')
-    btn.find('.spinner-border').removeClass('d-none')
+    btn.prop('disabled', true);
+    btn.find('.btn-text').text('Approving...');
+    btn.find('.spinner-border').removeClass('d-none');
 
     $.ajax({
-      url:'/admin/approve-student/'+studentId,
-      method:'POST',
-      data:{exam_type:examType},
-      success:function(){
-        btn.find('.spinner-border').addClass('d-none')
-        btn.find('.btn-text').text('Approved')
-        btn.removeClass('btn-success').addClass('btn-primary')
-      },
-      error:function(){
-        btn.prop('disabled',false)
-        btn.find('.spinner-border').addClass('d-none')
-        btn.find('.btn-text').text('Error')
-      }
-    })
-  })
+        url: '/admin/approve-student/' + studentId,
+        method: 'POST',
+        data: {
+            exam_type: examType
+        },
+        success: function (resp) {
+
+            if (resp.success) {
+                btn.removeClass('btn-success')
+                   .addClass('btn-primary');
+
+                btn.find('.btn-text').html('<i class="fa-solid fa-check"></i> Approved');
+                btn.find('.spinner-border').addClass('d-none');
+            }
+        },
+        error: function () {
+            btn.prop('disabled', false);
+            btn.find('.spinner-border').addClass('d-none');
+            btn.find('.btn-text').text('Error');
+        }
+    });
+});
 
   // Download PDF validation
   $('.download-pdf').click(function(e){
@@ -851,12 +862,7 @@ $(document).on('change', '.term-select, .exam-type, .year-input', function () {
 
     if (!term || !examType || !year) return;
 
-    // SAVE OPEN ACCORDION
-    let openAccordions = [];
-
-    $('.accordion-collapse.show').each(function () {
-        openAccordions.push(this.id);
-    });
+    let formId = form.replace(/\s+/g,'');
 
     $.ajax({
         url: "/admin",
@@ -868,22 +874,14 @@ $(document).on('change', '.term-select, .exam-type, .year-input', function () {
         },
         success: function(response){
 
-            let newHTML = $(response)
-                .find("#resultsAccordion")
-                .html();
+            let newContent = $(response);
 
-            $("#resultsAccordion").html(newHTML);
+            let newRows = newContent.find("#results-body-" + formId).html();
 
-            // REOPEN
-            openAccordions.forEach(id => {
-                $("#" + id).addClass("show");
-            });
-
+            $("#results-body-" + formId).html(newRows);
         }
     });
-
 });
-  
 
 $(document).on('shown.bs.collapse', function (e) {
     localStorage.setItem('openAccordion', e.target.id);
@@ -929,7 +927,25 @@ function rebindAdminFilters(){
     let newAccordion = $(response).find("#resultsAccordion").html();
 
     // 🔥 REPLACE CONTENT
-    $("#resultsAccordion").html(newAccordion);
+   $.ajax({
+    url: "/admin",
+    method: "GET",
+    data: {
+        term: term,
+        exam_type: examType,
+        year: year
+    },
+    success: function(response){
+
+        let newContent = $(response);
+
+        let formId = form.replace(/\s+/g,'');
+
+        let newTableBody = newContent.find("#results-body-" + formId).html();
+
+        $("#results-body-" + formId).html(newTableBody);
+    }
+});
 
     // 🔥 RESTORE OPEN STATE
     openAccordions.forEach(id => {
@@ -962,6 +978,10 @@ $(document).on('shown.bs.collapse', '.accordion-collapse', function () {
         this.id
     );
 
+});
+
+$(document).on('click', '.accordion-button', function(e){
+    e.stopPropagation();
 });
 
 

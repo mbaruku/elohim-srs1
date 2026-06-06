@@ -34,8 +34,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-# app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
+# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -168,12 +168,6 @@ def admin_dashboard():
 
     academic_year = int(year) if year else None
 
-    print("\n=== FILTER DEBUG ===")
-    print("TERM:", term)
-    print("EXAM:", exam_type)
-    print("YEAR:", academic_year)
-    print("====================\n")
-
     class_map = {
         "Form One": "Form1",
         "Form Two": "Form2",
@@ -193,7 +187,7 @@ def admin_dashboard():
         ).all()
 
         # =========================
-        # BASE QUERY SAFE FILTERING
+        # FILTER RESULTS
         # =========================
         query = StudentResult.query.filter(
             StudentResult.class_level == form
@@ -202,19 +196,16 @@ def admin_dashboard():
         if term:
             query = query.filter(StudentResult.term == term)
 
-        if academic_year:
-            query = query.filter(StudentResult.academic_year == academic_year)
-
-        # 🔥 IMPORTANT FIX: exam_type logic CLEAN
         if exam_type:
             query = query.filter(StudentResult.exam_type == exam_type)
 
+        if academic_year:
+            query = query.filter(StudentResult.academic_year == academic_year)
+
         all_results = query.all()
 
-        print(f"[{form}] RESULTS FOUND:", len(all_results))
-
         # =========================
-        # GROUPING
+        # GROUP BY STUDENT
         # =========================
         student_map = defaultdict(dict)
 
@@ -247,6 +238,8 @@ def admin_dashboard():
             count_subjects = 0
             subject_points = []
 
+            student_results = student_map.get(student.id, {}).values()
+
             for subject in subject_names:
 
                 r = student_map.get(student.id, {}).get(subject)
@@ -276,7 +269,7 @@ def admin_dashboard():
             ) if count_subjects else 0
 
             # =========================
-            # DIVISION LOGIC (UNCHANGED BUT SAFE)
+            # DIVISION
             # =========================
             division = None
             total_points = None
@@ -296,17 +289,28 @@ def admin_dashboard():
                 else:
                     division = "0"
 
+            # =========================
+            # 🔥 FIXED APPROVED LOGIC
+            # =========================
+            approved = False
+
+            if student_results:
+                approved = all(
+                    r.approved for r in student_results if r
+                )
+
             rows.append({
                 "student": student,
                 "marks": marks,
                 "complete": complete,
                 "average": average_marks,
                 "aggregate": total_points,
-                "division": division
+                "division": division,
+                "approved": approved,
             })
 
         # =========================
-        # RANKING (SAFE)
+        # RANKING
         # =========================
         rows = sorted(rows, key=lambda x: x["average"], reverse=True)
 
@@ -712,9 +716,18 @@ def get_grade_and_remarks(total):
 @app.route('/teacher/upload-result', methods=['POST'])
 def upload_result():
 
+    # ======================
+    # AUTH CHECK
+    # ======================
     if session.get('role') != 'teacher':
         return redirect('/login')
 
+    teacher_id = session.get('user_id')
+    is_class_teacher = session.get('is_class_teacher', False)
+
+    # ======================
+    # GET FORM DATA
+    # ======================
     subject = request.form.get('subject')
     class_level = request.form.get('class_level')
     term = request.form.get('term')
@@ -722,12 +735,30 @@ def upload_result():
     month = request.form.get('month')
     academic_year = request.form.get('academic_year')
 
+    # ======================
+    # VALIDATION
+    # ======================
     if not all([subject, class_level, term, exam_type, academic_year]):
         flash("Missing required fields!", "danger")
+
+        if is_class_teacher:
+            return redirect('/teacher/class-teacher-dashboard')
+
         return redirect('/teacher')
 
-    academic_year = int(academic_year)
+    try:
+        academic_year = int(academic_year)
+    except:
+        flash("Invalid academic year!", "danger")
 
+        if is_class_teacher:
+            return redirect('/teacher/class-teacher-dashboard')
+
+        return redirect('/teacher')
+
+    # ======================
+    # SUBJECT CHECK
+    # ======================
     subject_obj = Subject.query.filter_by(
         name=subject,
         class_level=class_level
@@ -735,19 +766,32 @@ def upload_result():
 
     if not subject_obj:
         flash("Subject not found!", "danger")
+
+        if is_class_teacher:
+            return redirect('/teacher/class-teacher-dashboard')
+
         return redirect('/teacher')
 
+    # ======================
+    # GET STUDENTS
+    # ======================
     students = User.query.filter_by(
         role='student',
         class_level=class_level
     ).all()
 
+    # ======================
+    # SAFE CONVERTER
+    # ======================
     def safe_float(v):
         try:
             return float(v)
         except:
             return 0.0
 
+    # ======================
+    # SAVE RESULTS
+    # ======================
     for student in students:
 
         sid = student.id
@@ -774,23 +818,30 @@ def upload_result():
 
         test1 = safe_float(request.form.get(f'test1_{sid}'))
         test2 = safe_float(request.form.get(f'test2_{sid}'))
-        exam = safe_float(request.form.get(f'exam_{sid}')) if request.form.get(f'exam_{sid}') else None
+        exam = request.form.get(f'exam_{sid}')
+
+        exam = safe_float(exam) if exam else None
 
         result.test1 = test1
         result.test2 = test2
+        result.exam_marks = exam
 
+        # ======================
+        # CALCULATIONS
+        # ======================
         if exam is not None:
-            result.exam_marks = exam
             total = test1 + test2 + exam
             average = total / 3
         else:
-            result.exam_marks = None
             total = test1 + test2
             average = total / 2 if (test1 or test2) else 0
 
         result.total = total
         result.average = average
 
+        # ======================
+        # GRADE
+        # ======================
         if average >= 75:
             result.grade = "A"
         elif average >= 65:
@@ -805,6 +856,13 @@ def upload_result():
     db.session.commit()
 
     flash("Results saved successfully!", "success")
+
+    # ======================
+    # SMART REDIRECT (IMPORTANT FIX)
+    # ======================
+    if is_class_teacher:
+        return redirect('/teacher/class-teacher-dashboard')
+
     return redirect('/teacher')
 
 from flask import session, redirect, render_template
@@ -1345,26 +1403,42 @@ def class_teacher_dashboard():
 def approve_student(student_id):
 
     exam_type = request.form.get('exam_type')
+    term = request.form.get('term')
+    year = request.form.get('year')
 
-    # 🔥 CHUKUA ZOTE za student (sio only unapproved)
+    # base query
     query = StudentResult.query.filter_by(student_id=student_id)
 
+    # optional filters (IMPORTANT for accuracy)
     if exam_type:
-        query = query.filter_by(exam_type=exam_type)
+        query = query.filter(StudentResult.exam_type == exam_type)
+
+    if term:
+        query = query.filter(StudentResult.term == term)
+
+    if year:
+        query = query.filter(StudentResult.academic_year == int(year))
 
     results = query.all()
 
     if not results:
-        return jsonify({"error": "No results found"}), 404
+        return jsonify({
+            "success": False,
+            "message": "No results found for this student"
+        }), 404
 
+    # approve all matched results
     for r in results:
         r.approved = True
-        if exam_type:
-            r.exam_type = exam_type
 
     db.session.commit()
 
-    return jsonify({"success": True})
+    return jsonify({
+        "success": True,
+        "message": "Student results approved successfully",
+        "student_id": student_id,
+        "approved_count": len(results)
+    })
 
 @app.route("/teacher/save-student-requirements", methods=["POST"])
 def save_student_requirements():
@@ -1638,19 +1712,16 @@ def view_results():
 
     try:
         academic_year = int(year)
-    except:
+    except (TypeError, ValueError):
         academic_year = None
 
-    # ✅ SORTED QUERY (IMPORTANT FIX)
     all_results = StudentResult.query.filter_by(
         subject=subject,
         class_level=class_level,
         term=term,
         academic_year=academic_year,
         exam_type=exam_type
-    ).join(StudentResult.student)\
-     .order_by(Student.username.asc())\
-     .all()
+    ).all()
 
     final_results = []
 
@@ -1660,15 +1731,17 @@ def view_results():
         t2 = r.test2 or 0
         exam = r.exam_marks or 0
 
-        # SIMPLE LOGIC
+        # Midterm = tests only
         if exam_type == "Midterm":
             total = t1 + t2
             average = total / 2 if (t1 or t2) else 0
+
+        # Terminal / Annual = tests + exam
         else:
             total = t1 + t2 + exam
             average = total / 3 if (t1 or t2 or exam) else 0
 
-        # GRADE
+        # Grade calculation
         if average >= 75:
             grade = "A"
         elif average >= 65:
@@ -1686,15 +1759,21 @@ def view_results():
             "test2": t2,
             "exam_marks": exam,
             "total": total,
-            "average": average,
+            "average": round(average, 2),
             "grade": grade
         })
 
-    # (Optional safety sort again in Python)
-    final_results.sort(key=lambda x: x["student"].username.lower())
+    # Sort alphabetically by student username
+    final_results.sort(
+        key=lambda x: (
+            x["student"].username.lower()
+            if x["student"] and x["student"].username
+            else ""
+        )
+    )
 
     return render_template(
-        "teacher/view_results.html",
+        'teacher/view_results.html',
         results=final_results,
         subject=subject,
         class_level=class_level,
@@ -1702,68 +1781,58 @@ def view_results():
         academic_year=academic_year,
         exam_type=exam_type
     )
-# @app.route('/teacher/download-results')
-# def download_results():
+@app.route('/teacher/download-results')
+def download_result():
 
-#     if 'role' not in session or session['role'] != 'teacher':
-#         return redirect('/login')
+    if 'role' not in session or session['role'] != 'teacher':
+        return redirect('/login')
 
-#     subject = request.args.get('subject')
-#     class_level = request.args.get('class_level')
-#     term = request.args.get('term')
-#     academic_year = request.args.get('academic_year')
+    subject = request.args.get('subject')
+    class_level = request.args.get('class_level')
+    term = request.args.get('term')
+    academic_year = request.args.get('academic_year')
 
-#     results = StudentResult.query.options(
-#         joinedload(StudentResult.student)
-#     ).filter_by(
-#         subject=subject,
-#         class_level=class_level,
-#         term=term,
-#         academic_year=academic_year
-#     ).order_by(StudentResult.average.desc()).all()
-
-#     def generate():
-
-#         yield "Position,Student,Test1,Test2,PreTest,Exam,Total,Average,Grade\n"
-
-#         position = 1
-
-#         for r in results:
-
-#             yield f"{position},{r.student.username},{r.test1},{r.test2},{r.pre_test},{r.exam_marks},{r.total},{round(r.average,2)},{r.grade}\n"
-
-#             position += 1
-
-#     return Response(
-#         generate(),
-#         mimetype='text/csv',
-#         headers={"Content-Disposition":"attachment; filename=results.csv"}
-#     )
-
-
-@app.route('/teacher/send-to-admin', methods=['POST'])
-def send_to_admin():
-
-    data = request.get_json()
-
-    subject = data['subject']
-    class_level = data['class_level']
-    term = data['term']
-    year = data['year']
-
-    # save approval request
-    approval = ResultsApproval(
+    results = StudentResult.query.options(
+        joinedload(StudentResult.student)
+    ).filter_by(
         subject=subject,
         class_level=class_level,
         term=term,
-        year=year,
-        status="pending"
+        academic_year=academic_year
+    ).order_by(StudentResult.average.desc()).all()
+
+    def safe(v):
+        return v if v is not None else 0
+
+    def generate():
+
+        # HEADER (corrected)
+        yield "Position,Student,Test1,Test2,Exam,Total,Average,Grade\n"
+
+        position = 1
+
+        for r in results:
+
+            test1 = safe(r.test1)
+            test2 = safe(r.test2)
+            exam = safe(r.exam_marks)
+            total = safe(r.total)
+            average = round(safe(r.average), 2)
+            grade = r.grade or ""
+
+            yield f"{position},{r.student.username},{test1},{test2},{exam},{total},{average},{grade}\n"
+
+            position += 1
+
+    return Response(
+        generate(),
+        mimetype='text/csv',
+        headers={
+            "Content-Disposition": "attachment; filename=results.csv"
+        }
     )
 
-    db.session.add(approval)
-    db.session.commit()
 
-    return jsonify({"message": "Results zimepelekwa kwa admin kwa approval"})
 
 
 @app.route('/teacher/edit-results')

@@ -166,16 +166,18 @@ Masomo Unayofundisha
 
     <!-- RIGHT BUTTONS -->
     <div>
-<button class="btn btn-primary upload-btn"
-        data-subject="{{ subject.id }}"
-        data-bs-toggle="modal"
-        data-bs-target="#uploadTestsModal_{{ subject.id }}">
-    Upload Result
-</button>
+<button
+            id="uploadResultBtn_{{ subject.id }}"
+            data-subject-id="{{ subject.id }}"
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#uploadModal_{{ subject.id }}">
+            Upload Result
+        </button>
 
         <button class="btn btn-info"
                 data-bs-toggle="modal"
-                data-bs-target="#viewResultsModal_{{ subject.id }}"
+                data-bs-target="#viewResultsModal_{{ subject.id }}">
             View Results
         </button>
 
@@ -188,177 +190,75 @@ Masomo Unayofundisha
 
 <!-- UPLOAD RESULTS MODAL -->
 
-<div class="modal fade" id="uploadTestsModal_{{ subject.id }}" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+<div class="modal fade" id="uploadModal_{{ subject.id }}" tabindex="-1">
+<div class="modal-dialog modal-xl">
 
-    <form method="POST" action="/teacher/upload-result">
+<form method="POST" action="/teacher/upload-result">
 
-      <input type="hidden" name="subject" value="{{ subject.subject }}">
-      <input type="hidden" name="class_level" value="{{ subject.class_level }}">
-      <input type="hidden" name="type" value="tests">
+<input type="hidden" name="subject" value="{{ subject.subject }}">
+<input type="hidden" name="class_level" value="{{ subject.class_level }}">
 
-      <input type="hidden" name="term" class="term-hidden">
-<input type="hidden" name="academic_year" class="year-hidden">
+<input type="hidden" name="term" class="term-hidden">
 <input type="hidden" name="exam_type" class="examtype-hidden">
+<input type="hidden" name="month" class="month-hidden">
+<input type="hidden" name="academic_year" class="year-hidden">
 
-      <div class="modal-content">
+<div class="modal-content">
 
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">
-            <i class="fa-solid fa-vial"></i>
-            Upload Tests - {{ subject.subject }}
-          </h5>
-          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
-
-        <div class="modal-body">
-
-          {% set key = subject.id %}
-          {% set students_list = subject_students_map.get(key, []) %}
-
-          <table class="table table-bordered tests-table">
-
-            <thead class="table-dark">
-              <tr>
-                <th>Mwanafunzi</th>
-                <th>Test 1</th>
-                <th>Test 2</th>
-                <th>Total</th>
-                <th>Average</th>
-                <th>Grade</th>
-              </tr>
-            </thead>
-
-            <tbody>
-
-              {% if students_list %}
-
-                {% for student in students_list %}
-                  <tr>
-
-                    <td>
-                      <input type="hidden" name="student_ids[]" value="{{ student.id }}">
-                      {{ student.username }}
-                    </td>
-
-                    <td>
-                      <input type="number" name="test1_{{ student.id }}" class="form-control test1-input">
-                    </td>
-
-                    <td>
-                      <input type="number" name="test2_{{ student.id }}" class="form-control test2-input">
-                    </td>
-
-                    <td class="total-cell">0</td>
-                    <td class="average-cell">0</td>
-                    <td class="grade-cell">Pending</td>
-
-                  </tr>
-                {% endfor %}
-
-              {% else %}
-
-                <tr>
-                  <td colspan="6" class="text-center text-muted">
-                    Hakuna wanafunzi kwa somo hili
-                  </td>
-                </tr>
-
-              {% endif %}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn btn-success" type="submit">
-            <i class="fa-solid fa-floppy-disk"></i> Save Tests
-          </button>
-        </div>
-
-      </div>
-
-    </form>
-
-  </div>
+<div class="modal-header bg-primary text-white">
+<h5>Upload Results - {{ subject.subject }}</h5>
+<button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
 </div>
-<div class="modal fade" id="uploadExamModal_{{ subject.id }}" tabindex="-1">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
 
-    <form method="POST" action="/teacher/upload-result">
+<div class="modal-body">
 
-      <input type="hidden" name="subject" value="{{ subject.subject }}">
-      <input type="hidden" name="class_level" value="{{ subject.class_level }}">
-      <input type="hidden" name="type" value="exam">
+<table class="table table-bordered">
 
-      <!-- muhimu -->
-      <input type="hidden" name="term" class="term-hidden">
-      <input type="hidden" name="academic_year" class="year-hidden">
-      <input type="hidden" name="exam_type" class="examtype-hidden">
+<thead class="table-dark">
+<tr>
+<th>Student</th>
+<th>Test 1</th>
+<th>Test 2</th>
+<th>Exam</th>
+<th>Total</th>
+<th>Average</th>
+<th>Grade</th>
+</tr>
+</thead>
 
-      <div class="modal-content">
+<tbody>
+{% for student in subject_students_map.get(subject.id, []) %}
+<tr>
 
-        <div class="modal-header bg-success text-white">
-          <h5 class="modal-title">
-            Upload Final Exam - {{ subject.subject }}
-          </h5>
-          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-        </div>
+<td>
+<input type="hidden" name="student_ids[]" value="{{ student.id }}">
+{{ student.username }}
+</td>
 
-        <div class="modal-body">
+<td><input type="number" name="test1_{{ student.id }}" class="form-control test1-input"></td>
+<td><input type="number" name="test2_{{ student.id }}" class="form-control test2-input"></td>
+<td><input type="number" name="exam_{{ student.id }}" class="form-control exam-input"></td>
 
-          <table class="table table-bordered exam-table">
+<td class="total-cell">0</td>
+<td class="average-cell">0</td>
+<td class="grade-cell">-</td>
 
-            <thead class="table-dark">
-              <tr>
-                <th>Mwanafunzi</th>
-                <th>Exam</th>
-                <th>Total</th>
-                <th>Average</th>
-                <th>Grade</th>
-              </tr>
-            </thead>
+</tr>
+{% endfor %}
+</tbody>
 
-            <tbody>
-              {% for student in students_list %}
-              <tr>
+</table>
 
-                <td>
-                  <input type="hidden" name="student_ids[]" value="{{ student.id }}">
-                  {{ student.username }}
-                </td>
+</div>
 
-                <td>
-                 <input type="number" name="exam_{{ student.id }}" class="form-control exam-input">
-                </td>
+<div class="modal-footer">
+<button class="btn btn-success">Save Results</button>
+</div>
 
-                <td>
-                  <input type="number" name="exam_marks_{{ student.id }}" class="form-control exam-input">
-                </td>
+</div>
+</form>
 
-                <td class="total-cell">0</td>
-                <td class="average-cell">0</td>
-                <td class="grade-cell">Pending</td>
-
-              </tr>
-              {% endfor %}
-            </tbody>
-
-          </table>
-
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn btn-success" type="submit">Save Exam</button>
-        </div>
-
-      </div>
-
-    </form>
-
-  </div>
+</div>
 </div>
 
 <div class="modal fade" id="viewResultsModal_{{ subject.id }}">
@@ -843,22 +743,7 @@ $(document).ready(function () {
     /* =============================
        TEST CALCULATION (REALTIME)
     ============================== */
-    $(document).on("input", ".test1-input, .test2-input", function () {
-
-        let row = $(this).closest("tr");
-
-        let t1 = parseFloat(row.find(".test1-input").val()) || 0;
-        let t2 = parseFloat(row.find(".test2-input").val()) || 0;
-
-        let total = t1 + t2;
-        let avg = total / 2;
-
-        let grade = getGrade(avg);
-
-        row.find(".total-cell").text(total.toFixed(2));
-        row.find(".average-cell").text(avg.toFixed(2));
-        row.find(".grade-cell").text(grade.text).css("color", grade.color);
-    });
+    
 
 
     /* =============================
@@ -885,50 +770,31 @@ $(document).ready(function () {
 
     /* =============================
        PASS DATA TO MODAL (IMPORTANT FIX)
-    ============================== */
-    document.querySelectorAll("[id^='uploadTestsModal_'], [id^='uploadExamModal_']").forEach(modal => {
+    document.querySelectorAll(".modal").forEach(modal => {
 
-        modal.addEventListener("show.bs.modal", function (event) {
+    modal.addEventListener("show.bs.modal", function (event) {
 
-            const button = event.relatedTarget;
-            const subjectId = button?.getAttribute("data-subject");
+        const button = event.relatedTarget;
+        if(!button) return;
 
-            if (!subjectId) return;
+        const subjectId = button.getAttribute("data-subject-id");
 
-            const termEl = document.querySelector(`.term-select[data-subject="${subjectId}"]`);
-            const examTypeEl = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`);
-            const yearEl = document.querySelector(`.year-input[data-subject="${subjectId}"]`);
+        const term = document.querySelector(`.term-select[data-subject-id="${subjectId}"]`)?.value;
+        const examType = document.querySelector(`.examtype-select[data-subject-id="${subjectId}"]`)?.value;
+        const month = document.querySelector(`.month-input[data-subject-id="${subjectId}"]`)?.value;
+        const year = document.querySelector(`.year-input[data-subject-id="${subjectId}"]`)?.value;
 
-            const term = termEl ? termEl.value : "";
-            const examType = examTypeEl ? examTypeEl.value : "";
-            const year = yearEl ? yearEl.value : "";
-
-            const termHidden = modal.querySelector(".term-hidden");
-            const examHidden = modal.querySelector(".examtype-hidden");
-            const yearHidden = modal.querySelector(".year-hidden");
-
-            if (termHidden) termHidden.value = term;
-            if (examHidden) examHidden.value = examType;
-            if (yearHidden) yearHidden.value = year;
-        });
+        modal.querySelector(".term-hidden").value = term;
+        modal.querySelector(".examtype-hidden").value = examType;
+        modal.querySelector(".month-hidden").value = month;
+        modal.querySelector(".year-hidden").value = year;
     });
 
+});
 
     /* =============================
        ENABLE / DISABLE LOGIC (OPTIONAL)
-    ============================== */
-    function updateButtons(subjectId){
-
-        const termEl = document.querySelector(`.term-select[data-subject="${subjectId}"]`);
-        const examEl = document.querySelector(`.examtype-select[data-subject="${subjectId}"]`);
-
-        const enable = termEl?.value && examEl?.value;
-
-        const testBtn = document.querySelector(`#uploadTestsBtn_${subjectId}`);
-        const examBtn = document.querySelector(`#uploadExamBtn_${subjectId}`);
-
-        if (testBtn) testBtn.disabled = !enable;
-        if (examBtn) examBtn.disabled = !enable;
+ 
     }
 
     document.addEventListener("change", function(e){
@@ -945,21 +811,7 @@ $(document).ready(function () {
     /* =============================
        RESET MODAL (IMPORTANT FIX)
     ============================== */
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('hidden.bs.modal', function () {
-
-            modal.querySelectorAll('input, select').forEach(el => {
-
-                if (
-                    el.classList.contains('term-hidden') ||
-                    el.classList.contains('year-hidden') ||
-                    el.classList.contains('examtype-hidden')
-                ) {
-                    el.value = "";
-                }
-            });
-        });
-    });
+    
 
 });
 </script>

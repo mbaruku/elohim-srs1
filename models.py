@@ -83,7 +83,6 @@ class StudentResult(db.Model):
     # TESTS
     test1 = db.Column(db.Float, default=0.0)
     test2 = db.Column(db.Float, default=0.0)
-    pre_test = db.Column(db.Float, default=0.0)
 
     # FINAL EXAM
     exam_type = db.Column(db.String(50))  # Terminal / Annual

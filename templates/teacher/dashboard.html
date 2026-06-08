@@ -314,7 +314,7 @@ View Results
 </thead>
 
 <tbody>
-{% for student in subject_students_map.get(subject.id, []) %}
+{% for student in subject_students_map.get(subject.id, []) | sort(attribute='username') %}
 <tr>
 
 <td>
@@ -513,23 +513,43 @@ document.addEventListener("input", function (e) {
 
         const row = e.target.closest("tr");
 
-        const t1 = parseFloat(row.querySelector(".test1-input").value) || 0;
-        const t2 = parseFloat(row.querySelector(".test2-input").value) || 0;
-        const exam = parseFloat(row.querySelector(".exam-input").value) || 0;
+        const test1Field = row.querySelector(".test1-input");
+        const test2Field = row.querySelector(".test2-input");
+        const examField = row.querySelector(".exam-input");
 
-        const total = t1 + t2 + exam;
-        const avg = total / 3;
+        let marks = [];
+        let total = 0;
+
+        if (test1Field.value !== "") {
+            const t1 = parseFloat(test1Field.value) || 0;
+            marks.push(t1);
+            total += t1;
+        }
+
+        if (test2Field.value !== "") {
+            const t2 = parseFloat(test2Field.value) || 0;
+            marks.push(t2);
+            total += t2;
+        }
+
+        if (examField.value !== "") {
+            const ex = parseFloat(examField.value) || 0;
+            marks.push(ex);
+            total += ex;
+        }
+
+        const avg = marks.length > 0 ? total / marks.length : 0;
 
         row.querySelector(".total-cell").textContent = total.toFixed(2);
         row.querySelector(".average-cell").textContent = avg.toFixed(2);
 
         const g = getGrade(avg);
+
         const gradeCell = row.querySelector(".grade-cell");
         gradeCell.textContent = g.text;
         gradeCell.style.color = g.color;
     }
 });
-
 
 /* ================= AUTO MONTH/YEAR ================= */
 

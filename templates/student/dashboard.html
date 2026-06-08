@@ -88,6 +88,54 @@ textarea {
                                         <div class="col-md-4"><b>Mwezi:</b> <span class="badge bg-success">{{ exam_month }}</span></div>
                                         <div class="col-md-4"><b>Mwaka:</b> <span class="badge bg-dark">{{ exam_year }}</span></div>
                                     </div>
+                                    <form method="GET" class="row g-2 mb-3">
+
+    <div class="col-md-4">
+        <select name="year" class="form-select">
+            <option value="">Academic Year</option>
+
+            {% for year in years %}
+            <option value="{{ year }}"
+            {% if selected_year == year|string %}selected{% endif %}>
+                {{ year }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <select name="term" class="form-select">
+            <option value="">Term</option>
+
+            {% for term in terms %}
+            <option value="{{ term }}"
+            {% if selected_term == term %}selected{% endif %}>
+                {{ term }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <select name="exam_type" class="form-select">
+            <option value="">Exam Type</option>
+
+            {% for exam in exam_types %}
+            <option value="{{ exam }}"
+            {% if selected_exam_type == exam %}selected{% endif %}>
+                {{ exam }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-12">
+        <button class="btn btn-primary">
+            <i class="fa fa-filter"></i> Chuja Matokeo
+        </button>
+    </div>
+
+</form>
 
                                     <div class="table-responsive mb-3">
                                         <div class="text-end mb-2">
@@ -100,7 +148,6 @@ textarea {
     <th>Somo</th>
     <th>Test 1</th>
     <th>Test 2</th>
-    <th>Pre Test</th>
     <th>Exam</th>
     <th>Total</th>
     <th>Average</th>
@@ -117,7 +164,6 @@ textarea {
 
     <td>{{ result.test1 or 0 }}</td>
     <td>{{ result.test2 or 0 }}</td>
-    <td>{{ result.pre_test or 0 }}</td>
     <td>{{ result.exam_marks or 0 }}</td>
 
     <td>{{ result.total or 0 }}</td>
@@ -126,21 +172,23 @@ textarea {
 
     <td>{{ result.grade }}</td>
 
-    <td>
-        {% set remark = result.remarks|lower %}
-        {% if "excellent" in remark %}
-            <span class="badge bg-success">Excellent</span>
-        {% elif "very good" in remark %}
-            <span class="badge bg-primary">Very Good</span>
-        {% elif "good" in remark %}
-            <span class="badge bg-info text-dark">Good</span>
-        {% elif "average" in remark %}
-            <span class="badge bg-warning text-dark">Average</span>
-        {% else %}
-            <span class="badge bg-danger">Poor</span>
-        {% endif %}
-    </td>
+  <td>
+    {% if result.remarks == "Excellent" %}
+        <span class="badge bg-success">Excellent</span>
 
+    {% elif result.remarks == "Very Good" %}
+        <span class="badge bg-primary">Very Good</span>
+
+    {% elif result.remarks == "Good" %}
+        <span class="badge bg-info text-dark">Good</span>
+
+    {% elif result.remarks == "Fair" %}
+        <span class="badge bg-warning text-dark">Fair</span>
+
+    {% else %}
+        <span class="badge bg-danger">Poor</span>
+    {% endif %}
+</td>
 </tr>
 {% endfor %}
 </tbody>

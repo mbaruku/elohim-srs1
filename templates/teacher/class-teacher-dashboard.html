@@ -227,7 +227,7 @@ Masomo Unayofundisha
 </thead>
 
 <tbody>
-{% for student in subject_students_map.get(subject.id, []) %}
+{% for student in subject_students_map.get(subject.id, []) | sort(attribute='username') %}
 <tr>
 
 <td>
@@ -749,23 +749,43 @@ $(document).ready(function () {
     /* =============================
        EXAM CALCULATION (REALTIME)
     ============================== */
-    $(document).on("input", ".exam-input", function () {
+   $(document).on("input", ".test1-input, .test2-input, .exam-input", function () {
 
-        let row = $(this).closest("tr");
+    let row = $(this).closest("tr");
 
-        let t1 = parseFloat(row.find(".test1-input").val()) || 0;
-        let t2 = parseFloat(row.find(".test2-input").val()) || 0;
-        let ex = parseFloat(row.find(".exam-input").val()) || 0;
+    let t1Val = row.find(".test1-input").val();
+    let t2Val = row.find(".test2-input").val();
+    let exVal = row.find(".exam-input").val();
 
-        let total = t1 + t2 + ex;
-        let avg = total / 3;
+    let marks = [];
+    let total = 0;
 
-        let grade = getGrade(avg);
+    if (t1Val !== "") {
+        let t1 = parseFloat(t1Val) || 0;
+        marks.push(t1);
+        total += t1;
+    }
 
-        row.find(".total-cell").text(total.toFixed(2));
-        row.find(".average-cell").text(avg.toFixed(2));
-        row.find(".grade-cell").text(grade.text).css("color", grade.color);
-    });
+    if (t2Val !== "") {
+        let t2 = parseFloat(t2Val) || 0;
+        marks.push(t2);
+        total += t2;
+    }
+
+    if (exVal !== "") {
+        let ex = parseFloat(exVal) || 0;
+        marks.push(ex);
+        total += ex;
+    }
+
+    let avg = marks.length > 0 ? (total / marks.length) : 0;
+
+    let grade = getGrade(avg);
+
+    row.find(".total-cell").text(total.toFixed(2));
+    row.find(".average-cell").text(avg.toFixed(2));
+    row.find(".grade-cell").text(grade.text).css("color", grade.color);
+});
 
 
     /* =============================

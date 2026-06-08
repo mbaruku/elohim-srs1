@@ -778,7 +778,7 @@ def upload_result():
     students = User.query.filter_by(
         role='student',
         class_level=class_level
-    ).all()
+    ).order_by(User.username.asc()).all()
 
     # ======================
     # SAFE CONVERTER
@@ -816,11 +816,16 @@ def upload_result():
             )
             db.session.add(result)
 
-        test1 = safe_float(request.form.get(f'test1_{sid}'))
-        test2 = safe_float(request.form.get(f'test2_{sid}'))
-        exam = request.form.get(f'exam_{sid}')
+        # ======================
+        # GET MARKS
+        # ======================
+        test1_raw = request.form.get(f'test1_{sid}')
+        test2_raw = request.form.get(f'test2_{sid}')
+        exam_raw = request.form.get(f'exam_{sid}')
 
-        exam = safe_float(exam) if exam else None
+        test1 = safe_float(test1_raw) if test1_raw not in [None, ''] else None
+        test2 = safe_float(test2_raw) if test2_raw not in [None, ''] else None
+        exam = safe_float(exam_raw) if exam_raw not in [None, ''] else None
 
         result.test1 = test1
         result.test2 = test2
@@ -829,12 +834,19 @@ def upload_result():
         # ======================
         # CALCULATIONS
         # ======================
+        marks = []
+
+        if test1 is not None:
+            marks.append(test1)
+
+        if test2 is not None:
+            marks.append(test2)
+
         if exam is not None:
-            total = test1 + test2 + exam
-            average = total / 3
-        else:
-            total = test1 + test2
-            average = total / 2 if (test1 or test2) else 0
+            marks.append(exam)
+
+        total = sum(marks)
+        average = total / len(marks) if marks else 0
 
         result.total = total
         result.average = average
@@ -858,7 +870,7 @@ def upload_result():
     flash("Results saved successfully!", "success")
 
     # ======================
-    # SMART REDIRECT (IMPORTANT FIX)
+    # SMART REDIRECT
     # ======================
     if is_class_teacher:
         return redirect('/teacher/class-teacher-dashboard')
@@ -874,14 +886,11 @@ def student_dashboard():
     if 'role' not in session or session['role'] != 'student':
         return redirect('/login')
 
-    # =========================
-    # GET STUDENT
-    # =========================
     student_id = session['user_id']
-    student = User.query.get(student_id)
+    student = User.query.get_or_404(student_id)
 
     # =========================
-    # SUBJECTS FILTER
+    # SUBJECT FILTER
     # =========================
     subjects_query = Subject.query.filter_by(
         class_level=student.class_level
@@ -899,118 +908,41 @@ def student_dashboard():
         subjects_allowed = [s.name for s in subjects_query]
 
     # =========================
-    # GET RESULTS
+    # FILTERS
     # =========================
-    results = StudentResult.query.filter(
+    selected_year = request.args.get('year')
+    selected_term = request.args.get('term')
+    selected_exam_type = request.args.get('exam_type')
+
+    # =========================
+    # RESULTS QUERY
+    # =========================
+    query = StudentResult.query.filter(
         StudentResult.student_id == student_id,
         StudentResult.subject.in_(subjects_allowed),
         StudentResult.approved == True
+    )
+
+    if selected_year:
+        query = query.filter(
+            StudentResult.academic_year == int(selected_year)
+        )
+
+    if selected_term:
+        query = query.filter(
+            StudentResult.term == selected_term
+        )
+
+    if selected_exam_type:
+        query = query.filter(
+            StudentResult.exam_type == selected_exam_type
+        )
+
+    results = query.order_by(
+        StudentResult.subject.asc()
     ).all()
 
     approved = len(results) > 0
-
-    exam_type = next((r.exam_type for r in results if r.exam_type), None)
-
-    # =========================
-    # 🔥 REMOVE DUPLICATES + GROUP PROPERLY
-    # =========================
-    subject_map = {}
-
-    for r in results:
-
-        key = r.subject
-
-        if key not in subject_map:
-            subject_map[key] = {
-                "midterm": None,
-                "terminal": None,
-                "annual": None
-            }
-
-        if r.exam_type == "Midterm":
-            subject_map[key]["midterm"] = r
-
-        elif r.exam_type == "Terminal":
-            subject_map[key]["terminal"] = r
-
-        elif r.exam_type == "Annual":
-            subject_map[key]["annual"] = r
-
-    # =========================
-    # 🔥 CALCULATION (SAME AS TEACHER)
-    # =========================
-    processed_subjects = []
-
-    for subject, d in subject_map.items():
-
-        mid = d["midterm"]
-        term_rec = d["terminal"] or d["annual"]
-
-        # -------------------------
-        # MIDTERM ONLY
-        # -------------------------
-        if mid and not term_rec:
-
-            t1 = mid.test1 or 0
-            t2 = mid.test2 or 0
-
-            avg = (t1 + t2) / 2 if (t1 or t2) else 0
-
-        # -------------------------
-        # TERMINAL / ANNUAL
-        # -------------------------
-        elif term_rec:
-
-            t1 = mid.test1 if mid else 0
-            t2 = mid.test2 if mid else 0
-            pre = term_rec.pre_test or 0
-            exam = term_rec.exam_marks or 0
-
-            combined_test = (t2 + pre) / 2
-            total = t1 + combined_test + exam
-
-            avg = total / 3 if (t1 or t2 or pre or exam) else 0
-
-        else:
-            avg = 0
-
-        processed_subjects.append(avg)
-
-    # =========================
-    # TOTAL & AVERAGE
-    # =========================
-    student_total_marks = sum(processed_subjects)
-
-    average_marks = (
-        sum(processed_subjects) / len(processed_subjects)
-        if processed_subjects else 0
-    )
-
-    # =========================
-    # RANK
-    # =========================
-    class_results = StudentResult.query.filter(
-        StudentResult.class_level == student.class_level,
-        StudentResult.subject.in_(subjects_allowed),
-        StudentResult.approved == True
-    ).all()
-
-    scores_by_student = {}
-
-    for r in class_results:
-        scores_by_student.setdefault(r.student_id, 0)
-        scores_by_student[r.student_id] += r.total or 0
-
-    sorted_students = sorted(
-        scores_by_student.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    rank = next(
-        (i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id),
-        None
-    )
 
     # =========================
     # REMARKS
@@ -1020,29 +952,98 @@ def student_dashboard():
         "B": "Very Good",
         "C": "Good",
         "D": "Fair",
-        "F": "Fail"
+        "F": "Poor"
     }
 
     for r in results:
         r.remarks = grade_remarks.get(r.grade, "-")
-        r.can_view = r.approved
+
+    # =========================
+    # FILTER OPTIONS
+    # =========================
+    all_results = StudentResult.query.filter_by(
+        student_id=student_id,
+        approved=True
+    ).all()
+
+    years = sorted(
+        list({r.academic_year for r in all_results}),
+        reverse=True
+    )
+
+    terms = sorted(
+        list({r.term for r in all_results if r.term})
+    )
+
+    exam_types = sorted(
+        list({r.exam_type for r in all_results if r.exam_type})
+    )
+
+    # =========================
+    # TOTALS
+    # =========================
+    student_total_marks = sum(
+        (r.total or 0)
+        for r in results
+    )
+
+    average_marks = (
+        sum((r.average or 0) for r in results) / len(results)
+        if results else 0
+    )
+
+    # =========================
+    # CLASS RANK
+    # =========================
+    class_results = StudentResult.query.filter(
+        StudentResult.class_level == student.class_level,
+        StudentResult.approved == True
+    ).all()
+
+    scores_by_student = {}
+
+    for r in class_results:
+        scores_by_student.setdefault(r.student_id, 0)
+        scores_by_student[r.student_id] += (r.total or 0)
+
+    sorted_students = sorted(
+        scores_by_student.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    rank = next(
+        (
+            i + 1
+            for i, (sid, _) in enumerate(sorted_students)
+            if sid == student_id
+        ),
+        None
+    )
+
+    total_students = len(scores_by_student)
 
     # =========================
     # DIVISION
     # =========================
-    points_map = {"A": 1, "B": 2, "C": 3, "D": 4, "F": 5}
+    points_map = {
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "F": 5
+    }
 
-    subject_points = []
+    subject_points = [
+        points_map[r.grade]
+        for r in results
+        if r.grade in points_map
+    ]
 
-    for r in results:
-        if r.grade in points_map:
-            subject_points.append(points_map[r.grade])
-
-    division = None
-    total_points = None
-    division_display = None
+    division_display = "Incomplete"
 
     if len(subject_points) >= 7:
+
         best7 = sorted(subject_points)[:7]
         total_points = sum(best7)
 
@@ -1057,12 +1058,10 @@ def student_dashboard():
         else:
             division = "0"
 
-        division_display = f"Division {division}-{total_points}"      
-    else:
-        division_display = "Incomplete"
+        division_display = f"Division {division}-{total_points}"
 
     # =========================
-    # PROFILE (FIXED)
+    # PROFILE
     # =========================
     profile = student.profile
 
@@ -1077,11 +1076,11 @@ def student_dashboard():
         "teacher_remarks": profile.teacher_remarks if profile else ""
     }
 
-    # =========================
-    # RESOURCES & EVENTS
-    # =========================
     resources = Resource.query.all()
-    events = Event.query.order_by(Event.created_at.desc()).all()
+
+    events = Event.query.order_by(
+        Event.created_at.desc()
+    ).all()
 
     now = datetime.now()
 
@@ -1091,28 +1090,34 @@ def student_dashboard():
         student=student,
         results=results,
         approved=approved,
-        exam_type=exam_type,
 
         rank=rank,
+        total_students=total_students,
+
         division=division_display,
-        total_points=total_points,
 
         student_total_marks=student_total_marks,
         average_marks=average_marks,
 
         profile=profile_data,
 
-        exam_month=now.strftime("%B"),
-        exam_year=now.year,
-
         resources=resources,
         events=events,
+
+        years=years,
+        terms=terms,
+        exam_types=exam_types,
+
+        selected_year=selected_year,
+        selected_term=selected_term,
+        selected_exam_type=selected_exam_type,
+
+        exam_month=now.strftime("%B"),
+        exam_year=now.year,
 
         combination=student.combination,
         subjects_allowed=subjects_allowed
     )
-
-
 @app.route("/fix-students-set-class")
 def fix_students_set_class():
     students = User.query.filter_by(role="student").all()

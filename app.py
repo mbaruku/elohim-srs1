@@ -25,30 +25,27 @@ import json
 
 # Import models na db
 from models import db, User, Subject, StudentResult, TeacherSubject, StudentProfile, Feedback, Resource, Event
-
-
-
 app = Flask(__name__)
 
 # SECRET KEY
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 # app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://myappuser:123456@localhost:5432/elohimdb"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
 db.init_app(app)
 
 # Migrate
-migrate = Migrate(app, db)
-
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+# migrate = Migrate(app, db)
+# @event.listens_for(Engine, "connect")
+# def set_sqlite_pragma(dbapi_connection, connection_record):
+#     cursor = dbapi_connection.cursor()
+#     cursor.execute("PRAGMA foreign_keys=ON")
+#     cursor.close()
 
 # Login manager
 login_manager = LoginManager()
@@ -716,49 +713,27 @@ def get_grade_and_remarks(total):
 @app.route('/teacher/upload-result', methods=['POST'])
 def upload_result():
 
-    # ======================
-    # AUTH CHECK
-    # ======================
     if session.get('role') != 'teacher':
         return redirect('/login')
 
-    teacher_id = session.get('user_id')
     is_class_teacher = session.get('is_class_teacher', False)
 
-    # ======================
-    # GET FORM DATA
-    # ======================
     subject = request.form.get('subject')
     class_level = request.form.get('class_level')
     term = request.form.get('term')
     exam_type = request.form.get('exam_type')
-    month = request.form.get('month')
     academic_year = request.form.get('academic_year')
 
-    # ======================
-    # VALIDATION
-    # ======================
     if not all([subject, class_level, term, exam_type, academic_year]):
         flash("Missing required fields!", "danger")
-
-        if is_class_teacher:
-            return redirect('/teacher/class-teacher-dashboard')
-
         return redirect('/teacher')
 
     try:
         academic_year = int(academic_year)
     except:
         flash("Invalid academic year!", "danger")
-
-        if is_class_teacher:
-            return redirect('/teacher/class-teacher-dashboard')
-
         return redirect('/teacher')
 
-    # ======================
-    # SUBJECT CHECK
-    # ======================
     subject_obj = Subject.query.filter_by(
         name=subject,
         class_level=class_level
@@ -766,32 +741,19 @@ def upload_result():
 
     if not subject_obj:
         flash("Subject not found!", "danger")
-
-        if is_class_teacher:
-            return redirect('/teacher/class-teacher-dashboard')
-
         return redirect('/teacher')
 
-    # ======================
-    # GET STUDENTS
-    # ======================
     students = User.query.filter_by(
         role='student',
         class_level=class_level
     ).order_by(User.username.asc()).all()
 
-    # ======================
-    # SAFE CONVERTER
-    # ======================
     def safe_float(v):
         try:
             return float(v)
         except:
-            return 0.0
+            return None
 
-    # ======================
-    # SAVE RESULTS
-    # ======================
     for student in students:
 
         sid = student.id
@@ -817,33 +779,37 @@ def upload_result():
             db.session.add(result)
 
         # ======================
-        # GET MARKS
+        # GET INPUTS
         # ======================
         test1_raw = request.form.get(f'test1_{sid}')
         test2_raw = request.form.get(f'test2_{sid}')
         exam_raw = request.form.get(f'exam_{sid}')
 
-        test1 = safe_float(test1_raw) if test1_raw not in [None, ''] else None
-        test2 = safe_float(test2_raw) if test2_raw not in [None, ''] else None
-        exam = safe_float(exam_raw) if exam_raw not in [None, ''] else None
+        # ======================
+        # UPDATE ONLY IF EXISTS
+        # ======================
+        if test1_raw not in [None, '']:
+            result.test1 = safe_float(test1_raw)
 
-        result.test1 = test1
-        result.test2 = test2
-        result.exam_marks = exam
+        if test2_raw not in [None, '']:
+            result.test2 = safe_float(test2_raw)
+
+        if exam_raw not in [None, '']:
+            result.exam_marks = safe_float(exam_raw)
 
         # ======================
-        # CALCULATIONS
+        # RECALCULATE SAFELY
         # ======================
         marks = []
 
-        if test1 is not None:
-            marks.append(test1)
+        if result.test1 is not None:
+            marks.append(result.test1)
 
-        if test2 is not None:
-            marks.append(test2)
+        if result.test2 is not None:
+            marks.append(result.test2)
 
-        if exam is not None:
-            marks.append(exam)
+        if result.exam_marks is not None:
+            marks.append(result.exam_marks)
 
         total = sum(marks)
         average = total / len(marks) if marks else 0
@@ -869,9 +835,6 @@ def upload_result():
 
     flash("Results saved successfully!", "success")
 
-    # ======================
-    # SMART REDIRECT
-    # ======================
     if is_class_teacher:
         return redirect('/teacher/class-teacher-dashboard')
 
@@ -1732,21 +1695,20 @@ def view_results():
 
     for r in all_results:
 
-        t1 = r.test1 or 0
-        t2 = r.test2 or 0
-        exam = r.exam_marks or 0
+        marks = []
 
-        # Midterm = tests only
-        if exam_type == "Midterm":
-            total = t1 + t2
-            average = total / 2 if (t1 or t2) else 0
+        if r.test1 is not None:
+            marks.append(r.test1)
 
-        # Terminal / Annual = tests + exam
-        else:
-            total = t1 + t2 + exam
-            average = total / 3 if (t1 or t2 or exam) else 0
+        if r.test2 is not None:
+            marks.append(r.test2)
 
-        # Grade calculation
+        if r.exam_marks is not None:
+            marks.append(r.exam_marks)
+
+        total = sum(marks)
+        average = total / len(marks) if marks else 0
+
         if average >= 75:
             grade = "A"
         elif average >= 65:
@@ -1760,15 +1722,14 @@ def view_results():
 
         final_results.append({
             "student": r.student,
-            "test1": t1,
-            "test2": t2,
-            "exam_marks": exam,
+            "test1": r.test1,
+            "test2": r.test2,
+            "exam_marks": r.exam_marks,
             "total": total,
             "average": round(average, 2),
             "grade": grade
         })
 
-    # Sort alphabetically by student username
     final_results.sort(
         key=lambda x: (
             x["student"].username.lower()

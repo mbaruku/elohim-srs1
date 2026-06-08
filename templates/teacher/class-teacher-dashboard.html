@@ -35,7 +35,25 @@ box-shadow:0 2px 6px rgba(0,0,0,0.1);
 
 </head>
 <body>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
 
+      {% for category, message in messages %}
+
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+
+          {{ message }}
+
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+
+        </div>
+
+      {% endfor %}
+
+    </div>
+  {% endif %}
+{% endwith %}
 <div class="container mt-4">
 
 <!-- HEADER -->
@@ -707,9 +725,10 @@ Hakuna feedback kutoka kwa wanafunzi bado.
 
 
 
-<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<<script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/select2.min.js') }}"></script>
+
 <script>
 $(document).ready(function () {
 
@@ -717,8 +736,11 @@ $(document).ready(function () {
        MONTH & YEAR AUTO FILL
     ============================== */
     document.querySelectorAll(".month-input").forEach(input => {
-        const months = ["January","February","March","April","May","June",
-            "July","August","September","October","November","December"];
+
+        const months = [
+            "January","February","March","April","May","June",
+            "July","August","September","October","November","December"
+        ];
 
         input.value = months[new Date().getMonth()];
     });
@@ -732,106 +754,183 @@ $(document).ready(function () {
        GRADE FUNCTION
     ============================== */
     function getGrade(avg){
-        if(avg >= 75) return {text: "A", color: "green"};
-        if(avg >= 65) return {text: "B", color: "blue"};
-        if(avg >= 45) return {text: "C", color: "goldenrod"};
-        if(avg >= 30) return {text: "D", color: "orange"};
-        return {text: "F", color: "red"};
+
+        if(avg >= 75){
+            return {text:"A", color:"green"};
+        }
+
+        if(avg >= 65){
+            return {text:"B", color:"blue"};
+        }
+
+        if(avg >= 45){
+            return {text:"C", color:"goldenrod"};
+        }
+
+        if(avg >= 30){
+            return {text:"D", color:"orange"};
+        }
+
+        return {text:"F", color:"red"};
     }
 
 
     /* =============================
-       TEST CALCULATION (REALTIME)
+       REALTIME CALCULATION
     ============================== */
-    
+    $(document).on("input", ".test1-input, .test2-input, .exam-input", function () {
 
+        let row = $(this).closest("tr");
 
-    /* =============================
-       EXAM CALCULATION (REALTIME)
-    ============================== */
-   $(document).on("input", ".test1-input, .test2-input, .exam-input", function () {
+        let t1Val = row.find(".test1-input").val();
+        let t2Val = row.find(".test2-input").val();
+        let exVal = row.find(".exam-input").val();
 
-    let row = $(this).closest("tr");
+        let marks = [];
+        let total = 0;
 
-    let t1Val = row.find(".test1-input").val();
-    let t2Val = row.find(".test2-input").val();
-    let exVal = row.find(".exam-input").val();
+        if (t1Val !== "") {
+            let t1 = parseFloat(t1Val) || 0;
+            marks.push(t1);
+            total += t1;
+        }
 
-    let marks = [];
-    let total = 0;
+        if (t2Val !== "") {
+            let t2 = parseFloat(t2Val) || 0;
+            marks.push(t2);
+            total += t2;
+        }
 
-    if (t1Val !== "") {
-        let t1 = parseFloat(t1Val) || 0;
-        marks.push(t1);
-        total += t1;
-    }
+        if (exVal !== "") {
+            let ex = parseFloat(exVal) || 0;
+            marks.push(ex);
+            total += ex;
+        }
 
-    if (t2Val !== "") {
-        let t2 = parseFloat(t2Val) || 0;
-        marks.push(t2);
-        total += t2;
-    }
+        let avg = marks.length > 0 ? (total / marks.length) : 0;
 
-    if (exVal !== "") {
-        let ex = parseFloat(exVal) || 0;
-        marks.push(ex);
-        total += ex;
-    }
+        let grade = getGrade(avg);
 
-    let avg = marks.length > 0 ? (total / marks.length) : 0;
+        row.find(".total-cell").text(total.toFixed(2));
+        row.find(".average-cell").text(avg.toFixed(2));
+        row.find(".grade-cell")
+            .text(grade.text)
+            .css("color", grade.color);
 
-    let grade = getGrade(avg);
-
-    row.find(".total-cell").text(total.toFixed(2));
-    row.find(".average-cell").text(avg.toFixed(2));
-    row.find(".grade-cell").text(grade.text).css("color", grade.color);
-});
-
-
-    /* =============================
-       PASS DATA TO MODAL (IMPORTANT FIX)
-    document.querySelectorAll(".modal").forEach(modal => {
-
-    modal.addEventListener("show.bs.modal", function (event) {
-
-        const button = event.relatedTarget;
-        if(!button) return;
-
-        const subjectId = button.getAttribute("data-subject-id");
-
-        const term = document.querySelector(`.term-select[data-subject-id="${subjectId}"]`)?.value;
-        const examType = document.querySelector(`.examtype-select[data-subject-id="${subjectId}"]`)?.value;
-        const month = document.querySelector(`.month-input[data-subject-id="${subjectId}"]`)?.value;
-        const year = document.querySelector(`.year-input[data-subject-id="${subjectId}"]`)?.value;
-
-        modal.querySelector(".term-hidden").value = term;
-        modal.querySelector(".examtype-hidden").value = examType;
-        modal.querySelector(".month-hidden").value = month;
-        modal.querySelector(".year-hidden").value = year;
     });
 
-});
 
     /* =============================
-       ENABLE / DISABLE LOGIC (OPTIONAL)
- 
+       PASS TERM/EXAM/YEAR TO MODAL
+    ============================== */
+    document.querySelectorAll('[id^="uploadModal_"]').forEach(modal => {
+
+        modal.addEventListener("show.bs.modal", function (event) {
+
+            const button = event.relatedTarget;
+
+            if (!button) return;
+
+            const subjectId = button.getAttribute("data-subject-id");
+
+            const term = document.querySelector(
+                `.term-select[data-subject="${subjectId}"]`
+            )?.value || "";
+
+            const examType = document.querySelector(
+                `.examtype-select[data-subject="${subjectId}"]`
+            )?.value || "";
+
+            const month = document.querySelector(
+                `.month-input[data-subject="${subjectId}"]`
+            )?.value || "";
+
+            const year = document.querySelector(
+                `.year-input[data-subject="${subjectId}"]`
+            )?.value || "";
+
+            modal.querySelector(".term-hidden").value = term;
+            modal.querySelector(".examtype-hidden").value = examType;
+            modal.querySelector(".month-hidden").value = month;
+            modal.querySelector(".year-hidden").value = year;
+
+        });
+
+    });
+
+
+    /* =============================
+       ENABLE/DISABLE UPLOAD BUTTON
+    ============================== */
+    function updateButtons(subjectId){
+
+        const term = document.querySelector(
+            `.term-select[data-subject="${subjectId}"]`
+        )?.value;
+
+        const examType = document.querySelector(
+            `.examtype-select[data-subject="${subjectId}"]`
+        )?.value;
+
+        const btn = document.getElementById(
+            `uploadResultBtn_${subjectId}`
+        );
+
+        if(!btn) return;
+
+        btn.disabled = !(term && examType);
     }
+
+    document.querySelectorAll('[id^="uploadResultBtn_"]').forEach(btn => {
+        btn.disabled = true;
+    });
 
     document.addEventListener("change", function(e){
 
-        if (
+        if(
             e.target.classList.contains("term-select") ||
             e.target.classList.contains("examtype-select")
-        ) {
-            updateButtons(e.target.dataset.subject);
+        ){
+
+            const subjectId =
+                e.target.getAttribute("data-subject");
+
+            updateButtons(subjectId);
         }
     });
 
 
     /* =============================
-       RESET MODAL (IMPORTANT FIX)
+       RESET MODAL WHEN CLOSED
     ============================== */
-    
+    document.querySelectorAll('[id^="uploadModal_"]').forEach(modal => {
+
+        modal.addEventListener("hidden.bs.modal", function(){
+
+            modal.querySelectorAll("input[type='number']")
+                .forEach(input => {
+                    input.value = "";
+                });
+
+            modal.querySelectorAll(".total-cell")
+                .forEach(cell => {
+                    cell.textContent = "0";
+                });
+
+            modal.querySelectorAll(".average-cell")
+                .forEach(cell => {
+                    cell.textContent = "0";
+                });
+
+            modal.querySelectorAll(".grade-cell")
+                .forEach(cell => {
+                    cell.textContent = "-";
+                    cell.style.color = "";
+                });
+
+        });
+
+    });
 
 });
 </script>

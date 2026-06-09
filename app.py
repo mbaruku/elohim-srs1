@@ -887,23 +887,15 @@ def student_dashboard():
     )
 
     if selected_year:
-        query = query.filter(
-            StudentResult.academic_year == int(selected_year)
-        )
+        query = query.filter(StudentResult.academic_year == selected_year)
 
     if selected_term:
-        query = query.filter(
-            StudentResult.term == selected_term
-        )
+        query = query.filter(StudentResult.term == selected_term)
 
     if selected_exam_type:
-        query = query.filter(
-            StudentResult.exam_type == selected_exam_type
-        )
+        query = query.filter(StudentResult.exam_type == selected_exam_type)
 
-    results = query.order_by(
-        StudentResult.subject.asc()
-    ).all()
+    results = query.order_by(StudentResult.subject.asc()).all()
 
     approved = len(results) > 0
 
@@ -919,75 +911,10 @@ def student_dashboard():
     }
 
     for r in results:
-        r.remarks = grade_remarks.get(r.grade, "-")
+        r.remarks = grade_remarks.get((r.grade or "").upper(), "-")
 
     # =========================
-    # FILTER OPTIONS
-    # =========================
-    all_results = StudentResult.query.filter_by(
-        student_id=student_id,
-        approved=True
-    ).all()
-
-    years = sorted(
-        list({r.academic_year for r in all_results}),
-        reverse=True
-    )
-
-    terms = sorted(
-        list({r.term for r in all_results if r.term})
-    )
-
-    exam_types = sorted(
-        list({r.exam_type for r in all_results if r.exam_type})
-    )
-
-    # =========================
-    # TOTALS
-    # =========================
-    student_total_marks = sum(
-        (r.total or 0)
-        for r in results
-    )
-
-    average_marks = (
-        sum((r.average or 0) for r in results) / len(results)
-        if results else 0
-    )
-
-    # =========================
-    # CLASS RANK
-    # =========================
-    class_results = StudentResult.query.filter(
-        StudentResult.class_level == student.class_level,
-        StudentResult.approved == True
-    ).all()
-
-    scores_by_student = {}
-
-    for r in class_results:
-        scores_by_student.setdefault(r.student_id, 0)
-        scores_by_student[r.student_id] += (r.total or 0)
-
-    sorted_students = sorted(
-        scores_by_student.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )
-
-    rank = next(
-        (
-            i + 1
-            for i, (sid, _) in enumerate(sorted_students)
-            if sid == student_id
-        ),
-        None
-    )
-
-    total_students = len(scores_by_student)
-
-    # =========================
-    # DIVISION
+    # POINTS + DIVISION (FIXED)
     # =========================
     points_map = {
         "A": 1,
@@ -998,10 +925,12 @@ def student_dashboard():
     }
 
     subject_points = [
-        points_map[r.grade]
+        points_map.get((r.grade or "").upper())
         for r in results
-        if r.grade in points_map
+        if (r.grade or "").upper() in points_map
     ]
+
+    total_points = None
 
     division_display = "Incomplete"
 
@@ -1019,12 +948,57 @@ def student_dashboard():
         elif 26 <= total_points <= 33:
             division = "IV"
         else:
-            division = "0"
+            division = "V"
 
-        division_display = f"Division {division}-{total_points}"
+        division_display = f"Division {division} - {total_points} Points"
 
     # =========================
-    # PROFILE
+    # CLASS RANK (FIXED)
+    # =========================
+    all_students = User.query.filter_by(
+        role='student',
+        class_level=student.class_level
+    ).all()
+
+    scores_by_student = {}
+
+    for s in all_students:
+
+        q = StudentResult.query.filter(
+            StudentResult.student_id == s.id,
+            StudentResult.approved == True
+        )
+
+        if selected_year:
+            q = q.filter(StudentResult.academic_year == selected_year)
+
+        if selected_term:
+            q = q.filter(StudentResult.term == selected_term)
+
+        if selected_exam_type:
+            q = q.filter(StudentResult.exam_type == selected_exam_type)
+
+        res = q.all()
+
+        total = sum(r.total or 0 for r in res)
+
+        scores_by_student[s.id] = total
+
+    sorted_students = sorted(
+        scores_by_student.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    rank = next(
+        (i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id),
+        None
+    )
+
+    total_students = len(scores_by_student)
+
+    # =========================
+    # PROFILE + OTHER DATA
     # =========================
     profile = student.profile
 
@@ -1040,10 +1014,7 @@ def student_dashboard():
     }
 
     resources = Resource.query.all()
-
-    events = Event.query.order_by(
-        Event.created_at.desc()
-    ).all()
+    events = Event.query.order_by(Event.created_at.desc()).all()
 
     now = datetime.now()
 
@@ -1058,18 +1029,15 @@ def student_dashboard():
         total_students=total_students,
 
         division=division_display,
-
-        student_total_marks=student_total_marks,
-        average_marks=average_marks,
+        total_points=total_points,   # 👈 IMPORTANT ADDED
 
         profile=profile_data,
-
         resources=resources,
         events=events,
 
-        years=years,
-        terms=terms,
-        exam_types=exam_types,
+        years=sorted(list({r.academic_year for r in StudentResult.query.filter_by(student_id=student_id).all()}), reverse=True),
+        terms=sorted(list({r.term for r in StudentResult.query.filter_by(student_id=student_id).all() if r.term})),
+        exam_types=sorted(list({r.exam_type for r in StudentResult.query.filter_by(student_id=student_id).all() if r.exam_type})),
 
         selected_year=selected_year,
         selected_term=selected_term,
@@ -1145,6 +1113,11 @@ def normalize_class_levels():
 
 
 
+from datetime import datetime
+from io import BytesIO
+from flask import render_template, request, session, redirect, make_response
+from xhtml2pdf import pisa
+
 @app.route('/student-report')
 def download_report():
 
@@ -1154,36 +1127,79 @@ def download_report():
     student_id = session['user_id']
     student = User.query.get_or_404(student_id)
 
-    results = StudentResult.query.filter_by(student_id=student_id).all()
+    year = request.args.get('year')
+    term = request.args.get('term')
+    exam_type = request.args.get('exam_type')
 
-    # TOTAL STUDENTS
-    total_students = User.query.filter_by(
-        role='student',
-        class_level=student.class_level
-    ).count()
+    generated_date = datetime.now().strftime("%d %B %Y, %H:%M")
 
-    # RANK CALCULATION
+    # =========================
+    # RESULTS
+    # =========================
+    query = StudentResult.query.filter(
+        StudentResult.student_id == student_id,
+        StudentResult.approved == True
+    )
+
+    if year:
+        query = query.filter(StudentResult.academic_year == year)
+
+    if term:
+        query = query.filter(StudentResult.term == term)
+
+    if exam_type:
+        query = query.filter(StudentResult.exam_type == exam_type)
+
+    results = query.all()
+
+    # =========================
+    # CLASS RANK
+    # =========================
     all_students = User.query.filter_by(
         role='student',
         class_level=student.class_level
     ).all()
 
-    scores = []
+    scores_by_student = {}
 
     for s in all_students:
-        student_results = StudentResult.query.filter_by(student_id=s.id).all()
-        total_score = sum([r.total or 0 for r in student_results])
-        scores.append((s.id, total_score))
 
-    scores.sort(key=lambda x: x[1], reverse=True)
+        q = StudentResult.query.filter(
+            StudentResult.student_id == s.id,
+            StudentResult.approved == True
+        )
 
-    rank = None
-    for i, s_tuple in enumerate(scores):
-        if s_tuple[0] == student_id:
-            rank = i + 1
-            break
+        if year:
+            q = q.filter(StudentResult.academic_year == year)
 
+        if term:
+            q = q.filter(StudentResult.term == term)
+
+        if exam_type:
+            q = q.filter(StudentResult.exam_type == exam_type)
+
+        res = q.all()
+
+        total = sum(r.total or 0 for r in res)
+
+        scores_by_student[s.id] = total
+
+    sorted_students = sorted(
+        scores_by_student.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    rank = next(
+        (i + 1 for i, (sid, _) in enumerate(sorted_students) if sid == student_id),
+        None
+    )
+
+    total_students = len(scores_by_student)
+
+    # =========================
     # REMARKS
+    # =========================
     grade_remarks = {
         "A": "Excellent",
         "B": "Very Good",
@@ -1195,58 +1211,70 @@ def download_report():
     for r in results:
         r.remarks = grade_remarks.get((r.grade or "").upper(), "-")
 
-    # DIVISION
-    points_map = {"A":1,"B":2,"C":3,"D":4,"F":5}
+    # =========================
+    # DIVISION (FIXED INDENTATION)
+    # =========================
+    points_map = {
+        "A": 1,
+        "B": 2,
+        "C": 3,
+        "D": 4,
+        "F": 5
+    }
 
-    total_points = sum([
-        points_map.get((r.grade or "").upper(),0)
+    subject_points = [
+        points_map.get((r.grade or "").upper())
         for r in results
-    ])
+        if (r.grade or "").upper() in points_map
+    ]
 
-    if 7 <= total_points <= 17:
-        division="I"
-    elif 18 <= total_points <= 22:
-        division="II"
-    elif 23 <= total_points <= 25:
-        division="III"
-    elif 26 <= total_points <= 33:
-        division="IV"
-    elif total_points >= 34:
-        division="V"
-    else:
-        division=None
+    division_display = "Incomplete"
 
+    if len(subject_points) >= 7:
 
+        best7 = sorted(subject_points)[:7]
+        total_points = sum(best7)
+
+        if 7 <= total_points <= 17:
+            division = "I"
+        elif 18 <= total_points <= 21:
+            division = "II"
+        elif 22 <= total_points <= 25:
+            division = "III"
+        elif 26 <= total_points <= 33:
+            division = "IV"
+        else:
+            division = "V"
+
+        division_display = f"Division {division} - {total_points} Points"
+
+    # =========================
+    # RENDER PDF
+    # =========================
     html = render_template(
         'student/student-report.html',
         student=student,
         results=results,
         rank=rank,
         total_students=total_students,
-        division=division
+        division=division_display,
+        year=year,
+        term=term,
+        exam_type=exam_type,
+        generated_date=generated_date
     )
 
     pdf = BytesIO()
-
-    pisa_status = pisa.CreatePDF(
-        html,
-        dest=pdf
-    )
+    pisa_status = pisa.CreatePDF(html, dest=pdf)
 
     if pisa_status.err:
         return "Hitilafu wakati wa kutengeneza PDF"
 
     response = make_response(pdf.getvalue())
-
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = 'inline; filename=student_report.pdf'
 
     return response
-
-
-
-
-
 # Helper: check if current user is class teacher
 def is_class_teacher():
     return session.get('role') == 'teacher' and session.get('is_class_teacher', False)
@@ -1695,20 +1723,34 @@ def view_results():
 
     for r in all_results:
 
+        # =========================
+        # MARKS COLLECTION (SAFE)
+        # =========================
         marks = []
 
         if r.test1 is not None:
-            marks.append(r.test1)
+            marks.append(float(r.test1))
 
         if r.test2 is not None:
-            marks.append(r.test2)
+            marks.append(float(r.test2))
 
         if r.exam_marks is not None:
-            marks.append(r.exam_marks)
+            marks.append(float(r.exam_marks))
 
+        # =========================
+        # TOTAL
+        # =========================
         total = sum(marks)
-        average = total / len(marks) if marks else 0
 
+        # =========================
+        # AVERAGE (SAFE)
+        # =========================
+        count = len(marks)
+        average = total / count if count > 0 else 0
+
+        # =========================
+        # GRADE
+        # =========================
         if average >= 75:
             grade = "A"
         elif average >= 65:
@@ -1720,6 +1762,9 @@ def view_results():
         else:
             grade = "F"
 
+        # =========================
+        # APPEND
+        # =========================
         final_results.append({
             "student": r.student,
             "test1": r.test1,
@@ -1730,12 +1775,12 @@ def view_results():
             "grade": grade
         })
 
+    # =========================
+    # SORT BY AVERAGE (DESC)
+    # =========================
     final_results.sort(
-        key=lambda x: (
-            x["student"].username.lower()
-            if x["student"] and x["student"].username
-            else ""
-        )
+        key=lambda x: x["average"],
+        reverse=True
     )
 
     return render_template(
@@ -1747,6 +1792,7 @@ def view_results():
         academic_year=academic_year,
         exam_type=exam_type
     )
+
 @app.route('/teacher/download-results')
 def download_result():
 
@@ -1970,23 +2016,141 @@ def filter_results():
         return "Server error", 500
     
 
+from flask import request, session, redirect, Response
+import csv
+from io import StringIO
+
+
+# =========================
+# EXPORT FUNCTION (SMART FIX)
+# =========================
+def get_class_results_for_export(class_level, term, exam_type, year):
+
+    class_level = class_level.strip()
+    term = term.strip()
+    exam_type = exam_type.strip()
+    year = int(year)
+
+    students = User.query.filter_by(
+        class_level=class_level,
+        role="student"
+    ).all()
+
+    results = []
+
+    for s in students:
+
+        subject_results = StudentResult.query.filter(
+            StudentResult.student_id == s.id,
+            StudentResult.class_level.ilike(class_level),
+            StudentResult.term.ilike(term),
+            StudentResult.exam_type.ilike(exam_type),
+            StudentResult.academic_year == year
+        ).all()
+
+        print(f"{s.full_name} -> {len(subject_results)} records found")
+
+        marks = {}
+        total = 0
+        count = 0
+
+        for r in subject_results:
+            marks[r.subject] = {
+                "marks": r.exam_marks,
+                "grade": r.grade
+            }
+
+            if r.exam_marks is not None:
+                total += r.exam_marks
+                count += 1
+
+        average = total / count if count > 0 else 0
+
+        results.append({
+            "student_name": s.full_name or s.username,
+            "average": round(average, 2),
+            "aggregate": total,
+            "division": "",
+            "position": "",
+            "marks": marks
+        })
+
+    return results
+
+
+# =========================
+# DOWNLOAD ROUTE
+# =========================
 @app.route('/admin/download-results')
 def download_results():
+
+    if session.get('role') != 'admin':
+        return redirect('/login')
 
     class_level = request.args.get('class')
     term = request.args.get('term')
     exam_type = request.args.get('exam_type')
     year = request.args.get('year')
 
-    results = StudentResult.query.filter(
-        StudentResult.class_level == class_level,
-        StudentResult.term == term,
-        StudentResult.exam_type == exam_type,
-        StudentResult.academic_year == int(year)
-    ).all()
+    if not all([class_level, term, exam_type, year]):
+        return "Missing filters", 400
 
-    return render_template("pdf_template.html", results=results, class_level=class_level)    
-    
+    results = get_class_results_for_export(
+        class_level, term, exam_type, year
+    )
+
+    if not results:
+        return "No results found for selected filters", 404
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # =========================
+    # HEADER
+    # =========================
+    first = results[0]
+    subjects = first["marks"].keys() if first else []
+
+    header = ["Student"]
+
+    for subject in subjects:
+        header.append(f"{subject} Marks")
+        header.append(f"{subject} Grade")
+
+    header += ["Average", "Aggregate", "Division", "Position"]
+
+    writer.writerow(header)
+
+    # =========================
+    # ROWS
+    # =========================
+    for r in results:
+        row = [r["student_name"]]
+
+        for subject in subjects:
+            mark_data = r["marks"].get(subject, {})
+            row.append(mark_data.get("marks", ""))
+            row.append(mark_data.get("grade", ""))
+
+        row += [
+            r["average"],
+            r["aggregate"],
+            r["division"],
+            r["position"]
+        ]
+
+        writer.writerow(row)
+
+    output.seek(0)
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=Results_{class_level}_{term}_{exam_type}_{year}.csv"
+        }
+    )
+
 
 if __name__ == "__main__": 
     app.run(debug=True)

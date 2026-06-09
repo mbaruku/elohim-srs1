@@ -249,12 +249,12 @@ Wanafunzi: {{ students }}
     <div class="col-md-2 text-end">
         <label class="form-label d-block">&nbsp;</label>
 
-        <button class="btn btn-danger download-pdf"
+        <!-- <button class="btn btn-danger download-pdf"
         data-form="{{ form }}"
         data-class="{{ form }}">
     <i class="fa-solid fa-file-pdf"></i>
     Download PDF
-</button>
+</button> -->
     </div>
 
 </div>
@@ -673,24 +673,29 @@ $(document).on('click', '.approve-btn', function () {
 
   // Download PDF validation
   $('.download-pdf').click(function(e){
-    e.preventDefault()
+    e.preventDefault();
 
-    let form = $(this).data('form')
-    let classLevel = $(this).data('class')
+    let form = $(this).data('form');
+    let classLevel = $(this).data('class');
 
-    let examType = $('.exam-type[data-form="'+form+'"]').val()
-    let term = $('.term-select[data-form="'+form+'"]').val()
-    let year = $('.year-input').val()
+    let examType = $('.exam-type[data-form="'+form+'"]').val();
+    let term = $('.term-select[data-form="'+form+'"]').val();
+    let year = $('.year-input').val();
 
     if(!examType || !term || !year){
-        alert("Chagua Term, Exam Type na Mwaka kwanza")
-        return
+        alert("Chagua Term, Exam Type na Mwaka kwanza");
+        return;
     }
 
-    let url = `/admin/download-results?class=${encodeURIComponent(classLevel)}&term=${encodeURIComponent(term)}&exam_type=${encodeURIComponent(examType)}&year=${year}`
+    // 🔥 CLEAN VALUES (VERY IMPORTANT FIX)
+    classLevel = classLevel.trim();
+    term = term.trim();
+    examType = examType.trim();
 
-    window.location.href = url
-})    
+    let url = `/admin/download-results?class=${encodeURIComponent(classLevel)}&term=${encodeURIComponent(term)}&exam_type=${encodeURIComponent(examType)}&year=${year}`;
+
+    window.location.href = url;
+});
 
 $(document).ready(function(){
 

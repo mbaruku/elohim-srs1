@@ -84,7 +84,6 @@ textarea {
                             {% if approved %}
                                 {% if results %}
                                     <div class="row mb-3">
-                                        <div class="col-md-4"><b>Aina ya Mtihani:</b> <span class="badge bg-primary">{{ exam_type }}</span></div>
                                         <div class="col-md-4"><b>Mwezi:</b> <span class="badge bg-success">{{ exam_month }}</span></div>
                                         <div class="col-md-4"><b>Mwaka:</b> <span class="badge bg-dark">{{ exam_year }}</span></div>
                                     </div>
@@ -139,7 +138,12 @@ textarea {
 
                                     <div class="table-responsive mb-3">
                                         <div class="text-end mb-2">
-                                            <a href="/student-report" class="btn btn-success"><i class="fa-solid fa-file-pdf"></i> Download Report PDF</a>
+                                            <a href="/student-report?year={{ selected_year }}&term={{ selected_term }}&exam_type={{ selected_exam_type }}"
+   class="btn btn-success">
+
+    <i class="fa-solid fa-file-pdf"></i>
+    Download Report PDF
+</a>
                                         </div>
                                        <table class="table table-bordered table-hover">
 
@@ -198,7 +202,11 @@ textarea {
 
                                     <div>
                                         <strong>Division:</strong> {{ division or "-" }} <br>
-                                        <strong>Amekuwa wa:</strong> {{ rank or "-" }} kati ya Wanafunzi{{ total_students }}
+                                        <strong>Position:</strong>
+        {{ rank or "-" }}
+        out of
+        {{ total_students }}
+        students
                                     </div>
 
                                 {% else %}

@@ -647,12 +647,17 @@ $(document).on('click', '.approve-btn', function () {
     btn.find('.btn-text').text('Approving...');
     btn.find('.spinner-border').removeClass('d-none');
 
-    $.ajax({
-        url: '/admin/approve-student/' + studentId,
-        method: 'POST',
-        data: {
-            exam_type: examType
-        },
+    let term = $('.term-select[data-form="'+form+'"]').val();
+    let year = $('.year-input').val();
+
+$.ajax({
+    url: '/admin/approve-student/' + studentId,
+    method: 'POST',
+    data: {
+        exam_type: examType,
+        term: term,
+        year: year
+    },
         success: function (resp) {
 
     if (resp.success) {
@@ -680,7 +685,6 @@ $(document).on('click', '.approve-btn', function () {
 
     let form = $(this).data('form');
     let classLevel = $(this).data('class');
-
     let examType = $('.exam-type[data-form="'+form+'"]').val();
     let term = $('.term-select[data-form="'+form+'"]').val();
     let year = $('.year-input').val();
@@ -694,7 +698,6 @@ $(document).on('click', '.approve-btn', function () {
     classLevel = classLevel.trim();
     term = term.trim();
     examType = examType.trim();
-
     let url = `/admin/download-results?class=${encodeURIComponent(classLevel)}&term=${encodeURIComponent(term)}&exam_type=${encodeURIComponent(examType)}&year=${year}`;
 
     window.location.href = url;

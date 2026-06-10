@@ -324,9 +324,7 @@ def admin_dashboard():
     return render_template(
         "admin/dashboard.html",
         class_results=class_results,
-        subjects=Subject.query.order_by(
-            Subject.class_level, Subject.name
-        ).all(),
+        subjects = Subject.query.order_by(Subject.id.asc()).all(),
         teachers=User.query.filter_by(role='teacher').count(),
         students=User.query.filter_by(role='student').count(),
         current_month=now.strftime("%B"),
@@ -1636,12 +1634,20 @@ def add_subject_bulk():
 @app.route("/admin/delete-subject/<int:id>", methods=["POST"])
 def delete_subject(id):
 
-    subject = Subject.query.get_or_404(id)
+    try:
+        subject = Subject.query.get_or_404(id)
 
-    db.session.delete(subject)
-    db.session.commit()
+        print("Deleting:", subject.id, subject.name, subject.class_level)
 
-    flash("Subject removed", "success")
+        db.session.delete(subject)
+        db.session.commit()
+
+        flash("Subject removed", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        print("DELETE ERROR:", str(e))
+        flash(str(e), "danger")
 
     return redirect(url_for("admin_dashboard"))
 

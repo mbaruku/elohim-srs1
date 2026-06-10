@@ -1400,10 +1400,8 @@ def approve_student(student_id):
     term = request.form.get('term')
     year = request.form.get('year')
 
-    # base query
     query = StudentResult.query.filter_by(student_id=student_id)
 
-    # optional filters (IMPORTANT for accuracy)
     if exam_type:
         query = query.filter(StudentResult.exam_type == exam_type)
 
@@ -1416,12 +1414,8 @@ def approve_student(student_id):
     results = query.all()
 
     if not results:
-        return jsonify({
-            "success": False,
-            "message": "No results found for this student"
-        }), 404
+        return jsonify({"success": False, "message": "No results found"}), 404
 
-    # approve all matched results
     for r in results:
         r.approved = True
 
@@ -1429,9 +1423,8 @@ def approve_student(student_id):
 
     return jsonify({
         "success": True,
-        "message": "Student results approved successfully",
         "student_id": student_id,
-        "approved_count": len(results)
+        "approved": True
     })
 
 @app.route("/teacher/save-student-requirements", methods=["POST"])

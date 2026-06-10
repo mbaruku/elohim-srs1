@@ -354,26 +354,15 @@ Wanafunzi: {{ students }}
 <td>
 
 {% if row.approved %}
-
-<button type="button"
-class="btn btn-success btn-sm approve-btn"
-data-student-id="{{ row.student.id }}"
-data-form="{{ form }}">
-
-<span class="btn-text">
-<i class="fa-solid fa-check"></i> Approve
-</span>
-
-<span class="spinner-border spinner-border-sm d-none"></span>
-
-</button>
-
+    <button class="btn btn-primary btn-sm" disabled>
+        <i class="fa-solid fa-check"></i> Approved
+    </button>
 {% else %}
-
-<button class="btn btn-secondary btn-sm" disabled>
-<i class="fa-solid fa-clock"></i> Pending
-</button>
-
+    <button class="btn btn-success btn-sm approve-btn"
+            data-student-id="{{ row.student.id }}"
+            data-form="{{ form }}">
+        Approve
+    </button>
 {% endif %}
 
 </td>
@@ -636,45 +625,45 @@ $(document).on('click', '.approve-btn', function () {
     var btn = $(this);
     var studentId = btn.data('student-id');
     var form = btn.data('form');
-    var examType = $('.exam-type[data-form="'+form+'"]').val();
 
-    if (!examType) {
-        alert("Chagua Type of Exam kwanza");
+    var examType = $('.exam-type[data-form="'+form+'"]').val();
+    var term = $('.term-select[data-form="'+form+'"]').val();
+    var year = $('.year-input').val();
+
+    if (!examType || !term || !year) {
+        alert("Chagua Term, Exam Type na Mwaka kwanza");
         return;
     }
 
     btn.prop('disabled', true);
-    btn.find('.btn-text').text('Approving...');
-    btn.find('.spinner-border').removeClass('d-none');
+    btn.html('<i class="fa fa-spinner fa-spin"></i> Approving...');
 
-    let term = $('.term-select[data-form="'+form+'"]').val();
-    let year = $('.year-input').val();
-
-$.ajax({
-    url: '/admin/approve-student/' + studentId,
-    method: 'POST',
-    data: {
-        exam_type: examType,
-        term: term,
-        year: year
-    },
+    $.ajax({
+        url: '/admin/approve-student/' + studentId,
+        method: 'POST',
+        data: {
+            exam_type: examType,
+            term: term,
+            year: year
+        },
         success: function (resp) {
 
-    if (resp.success) {
+            if (resp.success) {
 
-        btn.removeClass('btn-success btn-primary btn-secondary')
-           .addClass('btn-primary');
+                // 🔥 CHANGE BUTTON TO APPROVED IMMEDIATELY
+                btn.removeClass('btn-success btn-secondary')
+                   .addClass('btn-primary')
+                   .html('<i class="fa-solid fa-check"></i> Approved')
+                   .prop('disabled', true);
 
-        btn.html('<i class="fa-solid fa-check"></i> Approved');
-
-        btn.prop('disabled', true);
-
-    }
-},
+                // 🔥 OPTIONAL: update row UI
+                btn.closest('tr').addClass('table-success');
+            }
+        },
         error: function () {
             btn.prop('disabled', false);
-            btn.find('.spinner-border').addClass('d-none');
-            btn.find('.btn-text').text('Error');
+            btn.html('Approve');
+            alert("Error approving student");
         }
     });
 });

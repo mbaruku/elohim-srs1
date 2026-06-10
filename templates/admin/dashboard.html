@@ -655,14 +655,17 @@ $(document).on('click', '.approve-btn', function () {
         },
         success: function (resp) {
 
-            if (resp.success) {
-                btn.removeClass('btn-success')
-                   .addClass('btn-primary');
+    if (resp.success) {
 
-                btn.find('.btn-text').html('<i class="fa-solid fa-check"></i> Approved');
-                btn.find('.spinner-border').addClass('d-none');
-            }
-        },
+        btn.removeClass('btn-success btn-primary btn-secondary')
+           .addClass('btn-primary');
+
+        btn.html('<i class="fa-solid fa-check"></i> Approved');
+
+        btn.prop('disabled', true);
+
+    }
+},
         error: function () {
             btn.prop('disabled', false);
             btn.find('.spinner-border').addClass('d-none');
@@ -731,7 +734,7 @@ new bootstrap.Toast(this).show()
 
 // approve results
 
-$('.approve-btn').click(function(){
+$('.approve-btn55').click(function(){
 
 var btn = $(this)
 

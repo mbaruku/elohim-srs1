@@ -32,8 +32,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # DATABASE
 # app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-# app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
-app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://myappuser:123456@localhost:5432/elohimdb"
+app.config['SQLALCHEMY_DATABASE_URI'] ='sqlite:///elohim.db'
+# app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://myappuser:123456@localhost:5432/elohimdb"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
@@ -1306,10 +1306,10 @@ def class_teacher_dashboard():
     # =========================
     # STUDENTS
     # =========================
-    students = User.query.filter(
-        User.role == "student",
-        User.class_level.in_(class_levels)
-    ).all()
+    students = User.query.filter_by(
+    role="student",
+    class_level=teacher.class_level
+).all()
 
     student_ids = [s.id for s in students]
 

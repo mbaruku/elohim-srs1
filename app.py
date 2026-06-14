@@ -1306,9 +1306,9 @@ def class_teacher_dashboard():
     # =========================
     # STUDENTS
     # =========================
-    students = User.query.filter_by(
-    role="student",
-    class_level=teacher.class_level
+    students = User.query.filter(
+    User.role == "student",
+    User.class_level.in_(class_levels)
 ).all()
 
     student_ids = [s.id for s in students]
